@@ -1,0 +1,436 @@
+@import "tailwindcss" source(none);
+@import "tw-animate-css";
+@source ".";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Clinic Compass design system — Batch 0 foundation tokens.
+ * Clinical, calm, mobile-first. Desaturated indigo primary, role-based neutrals,
+ * semantic triples (surface / line / text). Pages adopt tokens in later batches.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+
+  /* Neutral scale (role-named) */
+  --color-ink-900: var(--ink-900);
+  --color-ink-700: var(--ink-700);
+  --color-ink-500: var(--ink-500);
+  --color-ink-300: var(--ink-300);
+  --color-line: var(--line);
+  --color-surface-2: var(--surface-2);
+  --color-surface-1: var(--surface-1);
+  --color-canvas: var(--canvas);
+
+  /* Semantic triples */
+  --color-success-surface: var(--success-surface);
+  --color-success-line: var(--success-line);
+  --color-success-text: var(--success-text);
+  --color-warning-surface: var(--warning-surface);
+  --color-warning-line: var(--warning-line);
+  --color-warning-text: var(--warning-text);
+  --color-danger-surface: var(--danger-surface);
+  --color-danger-line: var(--danger-line);
+  --color-danger-text: var(--danger-text);
+  --color-info-surface: var(--info-surface);
+  --color-info-line: var(--info-line);
+  --color-info-text: var(--info-text);
+
+  /* Link, Connect, Patent+ — each its own colour */
+  --color-menu-link-surface: var(--menu-link-surface);
+  --color-menu-link-text: var(--menu-link-text);
+  --color-menu-connect-surface: var(--menu-connect-surface);
+  --color-menu-connect-text: var(--menu-connect-text);
+  --color-menu-patent-surface: var(--menu-patent-surface);
+  --color-menu-patent-text: var(--menu-patent-text);
+
+  /* Identity tiles (name-hash tinted, never status) */
+  --color-tile-1-surface: var(--tile-1-surface);
+  --color-tile-1-text: var(--tile-1-text);
+  --color-tile-2-surface: var(--tile-2-surface);
+  --color-tile-2-text: var(--tile-2-text);
+  --color-tile-3-surface: var(--tile-3-surface);
+  --color-tile-3-text: var(--tile-3-text);
+  --color-tile-4-surface: var(--tile-4-surface);
+  --color-tile-4-text: var(--tile-4-text);
+  --color-tile-5-surface: var(--tile-5-surface);
+  --color-tile-5-text: var(--tile-5-text);
+  --color-tile-6-surface: var(--tile-6-surface);
+  --color-tile-6-text: var(--tile-6-text);
+
+  /* Legacy aliases (existing components) */
+  --color-background: var(--canvas);
+  --color-foreground: var(--ink-900);
+  --color-card: var(--surface-1);
+  --color-card-foreground: var(--ink-900);
+  --color-popover: var(--surface-1);
+  --color-popover-foreground: var(--ink-900);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--surface-2);
+  --color-muted-foreground: var(--ink-500);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--danger-text);
+  --color-destructive-foreground: var(--danger-foreground);
+  --color-success: var(--success-text);
+  --color-success-foreground: var(--success-on);
+  --color-warning: var(--warning-text);
+  --color-warning-foreground: var(--warning-on);
+  --color-info: var(--info-text);
+  --color-info-foreground: var(--info-on);
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--canvas);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Type scale (registered; apply in later batches) */
+  --text-display-size: 1.875rem;
+  --text-display-line: 2.25rem;
+  --text-h1-size: 1.5rem;
+  --text-h1-line: 2rem;
+  --text-h2-size: 1.125rem;
+  --text-h2-line: 1.625rem;
+  --text-h3-size: 0.9375rem;
+  --text-h3-line: 1.375rem;
+  --text-body-size: 0.875rem;
+  --text-body-line: 1.375rem;
+  --text-meta-size: 0.8125rem;
+  --text-meta-line: 1.25rem;
+  --text-caption-size: 0.75rem;
+  --text-caption-line: 1rem;
+
+  /* Spacing scale (registered; apply in later batches) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+  --shadow-card-hover: 0 6px 16px -2px rgb(0 0 0 / 0.08), 0 3px 6px -3px rgb(0 0 0 / 0.05);
+  --shadow-float: 0 12px 32px oklch(0.35 0.05 220 / 0.12);
+}
+
+:root {
+  --radius: 0.625rem;
+
+  /* Neutral scale — cool clinical greys */
+  --ink-900: oklch(0.23 0.035 250);
+  --ink-700: oklch(0.38 0.03 250);
+  --ink-500: oklch(0.52 0.025 250);
+  --ink-300: oklch(0.72 0.02 245);
+  --line: oklch(0.9 0.015 245);
+  --surface-2: oklch(0.96 0.008 250);
+  --surface-1: oklch(1 0 0);
+  --canvas: oklch(0.985 0.005 250);
+
+  /* Primary — desaturated indigo */
+  --primary: oklch(0.5 0.16 264);
+  --primary-foreground: oklch(0.99 0.005 264);
+  --secondary: oklch(0.96 0.01 250);
+  --secondary-foreground: oklch(0.3 0.04 260);
+  --accent: oklch(0.95 0.03 264);
+  --accent-foreground: oklch(0.35 0.12 264);
+  --ring: oklch(0.5 0.16 264);
+
+  /* Semantic triples — higher contrast for doctor decode */
+  --success-surface: oklch(0.95 0.05 155);
+  --success-line: oklch(0.8 0.09 155);
+  --success-text: oklch(0.4 0.13 155);
+  --success-on: oklch(0.99 0.005 155);
+
+  --warning-surface: oklch(0.96 0.08 85);
+  --warning-line: oklch(0.78 0.14 70);
+  --warning-text: oklch(0.48 0.16 55);
+  --warning-on: oklch(0.99 0.01 85);
+
+  --danger-surface: oklch(0.96 0.035 22);
+  --danger-line: oklch(0.82 0.1 22);
+  --danger-text: oklch(0.48 0.19 25);
+  --danger-foreground: oklch(0.99 0.005 22);
+
+  --info-surface: oklch(0.95 0.045 245);
+  --info-line: oklch(0.8 0.09 245);
+  --info-text: oklch(0.42 0.13 245);
+  --info-on: oklch(0.99 0.005 245);
+
+  --menu-link-surface: oklch(0.94 0.055 192);
+  --menu-link-text: oklch(0.44 0.1 192);
+  --menu-connect-surface: oklch(0.94 0.05 300);
+  --menu-connect-text: oklch(0.45 0.14 300);
+  --menu-patent-surface: oklch(0.95 0.045 25);
+  --menu-patent-text: oklch(0.48 0.15 25);
+
+  /* Identity tiles — muted, low-chroma, name-hash tinted */
+  --tile-1-surface: oklch(0.93 0.03 250);
+  --tile-1-text: oklch(0.4 0.11 250);
+  --tile-2-surface: oklch(0.93 0.03 155);
+  --tile-2-text: oklch(0.4 0.11 155);
+  --tile-3-surface: oklch(0.93 0.035 35);
+  --tile-3-text: oklch(0.44 0.11 35);
+  --tile-4-surface: oklch(0.93 0.03 300);
+  --tile-4-text: oklch(0.44 0.1 300);
+  --tile-5-surface: oklch(0.93 0.03 220);
+  --tile-5-text: oklch(0.4 0.1 220);
+  --tile-6-surface: oklch(0.93 0.035 95);
+  --tile-6-text: oklch(0.42 0.09 95);
+
+  --chart-1: oklch(0.5 0.16 264);
+  --chart-2: oklch(0.42 0.13 155);
+  --chart-3: oklch(0.45 0.12 245);
+  --chart-4: oklch(0.5 0.14 60);
+  --chart-5: oklch(0.48 0.1 300);
+
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.23 0.035 250);
+  --sidebar-primary: oklch(0.5 0.16 264);
+  --sidebar-primary-foreground: oklch(0.99 0.005 264);
+  --sidebar-accent: oklch(0.96 0.02 264);
+  --sidebar-accent-foreground: oklch(0.35 0.12 264);
+  --sidebar-border: oklch(0.9 0.015 245);
+  --sidebar-ring: oklch(0.5 0.16 264);
+}
+
+.dark {
+  --ink-900: oklch(0.96 0.008 250);
+  --ink-700: oklch(0.82 0.015 250);
+  --ink-500: oklch(0.72 0.02 250);
+  --ink-300: oklch(0.55 0.025 255);
+  --line: oklch(1 0 0 / 12%);
+  --surface-2: oklch(0.28 0.03 265);
+  --surface-1: oklch(0.23 0.035 265);
+  --canvas: oklch(0.18 0.03 265);
+
+  --primary: oklch(0.65 0.14 264);
+  --primary-foreground: oklch(0.18 0.03 264);
+  --secondary: oklch(0.28 0.03 255);
+  --secondary-foreground: oklch(0.96 0.008 250);
+  --accent: oklch(0.32 0.06 264);
+  --accent-foreground: oklch(0.96 0.008 250);
+  --ring: oklch(0.65 0.14 264);
+
+  --success-surface: oklch(0.3 0.055 155);
+  --success-line: oklch(0.42 0.09 155);
+  --success-text: oklch(0.8 0.12 155);
+  --success-on: oklch(0.16 0.02 155);
+
+  --warning-surface: oklch(0.34 0.08 75);
+  --warning-line: oklch(0.5 0.13 70);
+  --warning-text: oklch(0.88 0.14 85);
+  --warning-on: oklch(0.18 0.04 60);
+
+  --danger-surface: oklch(0.3 0.055 22);
+  --danger-line: oklch(0.45 0.11 22);
+  --danger-text: oklch(0.78 0.16 25);
+  --danger-foreground: oklch(0.16 0.02 22);
+
+  --info-surface: oklch(0.3 0.055 245);
+  --info-line: oklch(0.42 0.09 245);
+  --info-text: oklch(0.8 0.12 245);
+  --info-on: oklch(0.16 0.02 245);
+
+  --menu-link-surface: oklch(0.3 0.06 192);
+  --menu-link-text: oklch(0.82 0.11 192);
+  --menu-connect-surface: oklch(0.32 0.07 300);
+  --menu-connect-text: oklch(0.84 0.1 300);
+  --menu-patent-surface: oklch(0.32 0.07 25);
+  --menu-patent-text: oklch(0.84 0.1 25);
+
+  --tile-1-surface: oklch(0.32 0.045 264);
+  --tile-1-text: oklch(0.82 0.08 264);
+  --tile-2-surface: oklch(0.32 0.045 158);
+  --tile-2-text: oklch(0.82 0.08 158);
+  --tile-3-surface: oklch(0.32 0.05 30);
+  --tile-3-text: oklch(0.84 0.08 30);
+  --tile-4-surface: oklch(0.32 0.045 300);
+  --tile-4-text: oklch(0.84 0.08 300);
+  --tile-5-surface: oklch(0.32 0.045 220);
+  --tile-5-text: oklch(0.82 0.08 220);
+  --tile-6-surface: oklch(0.32 0.05 100);
+  --tile-6-text: oklch(0.82 0.06 100);
+
+  --chart-1: oklch(0.63 0.14 264);
+  --chart-2: oklch(0.75 0.12 158);
+  --chart-3: oklch(0.75 0.12 250);
+  --chart-4: oklch(0.82 0.12 78);
+  --chart-5: oklch(0.68 0.1 300);
+
+  --sidebar: oklch(0.21 0.03 265);
+  --sidebar-foreground: oklch(0.96 0.008 250);
+  --sidebar-primary: oklch(0.65 0.14 264);
+  --sidebar-primary-foreground: oklch(0.18 0.03 264);
+  --sidebar-accent: oklch(0.3 0.05 264);
+  --sidebar-accent-foreground: oklch(0.96 0.008 250);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.63 0.14 264);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+    font-size: 15px;
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  @media (min-width: 640px) {
+    html {
+      font-size: 16px;
+    }
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-size: 0.875rem;
+    line-height: 1.375rem;
+    font-family:
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      "Segoe UI",
+      Roboto,
+      sans-serif;
+  }
+
+  /* Keep switches at fixed thumb-track size */
+  button[role="switch"] {
+    box-sizing: border-box !important;
+    height: 20px !important;
+    min-height: 20px !important;
+    max-height: 20px !important;
+    width: 36px !important;
+    min-width: 36px !important;
+    max-width: 36px !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /*
+   * Form fields: 40px on phone, 36px from sm up.
+   * 16px type on phone so iOS does not zoom. Do not force height —
+   * that stretched every control and looked oversized.
+   */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="range"]),
+  select,
+  [data-slot="select-trigger"] {
+    min-height: 40px;
+  }
+
+  textarea,
+  input[type="file"] {
+    min-height: 40px;
+  }
+
+  @media (min-width: 640px) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="range"]),
+    select,
+    textarea,
+    input[type="file"],
+    [data-slot="select-trigger"] {
+      min-height: 36px;
+    }
+  }
+
+  @media (max-width: 639px) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]),
+    select,
+    textarea,
+    [data-slot="select-trigger"],
+    [data-slot="select-item"] {
+      font-size: 16px !important;
+    }
+
+    textarea {
+      min-height: 4.5rem;
+      height: auto;
+    }
+  }
+}
+
+@utility surface-card {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+}
+
+.surface-card:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+/* Invoice bill template — print only the sheet */
+@page {
+  size: A4 portrait;
+  margin: 0;
+}
+
+@media print {
+  html,
+  body {
+    width: 210mm !important;
+    min-height: 297mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  #invoice-bill-template,
+  #invoice-bill-template * {
+    visibility: visible !important;
+  }
+
+  .invoice-bill-fit-content {
+    transform: none !important;
+  }
+
+  #invoice-bill-template {
+    position: absolute;
+    left: 10mm;
+    top: 10mm;
+    width: 190mm !important;
+    min-height: 277mm !important;
+    max-width: 190mm !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    background: white !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
