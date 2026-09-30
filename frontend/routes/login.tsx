@@ -8,6 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { useSession } from "@/hooks/use-session";
+import { ensureClinicProfileForSession } from "@/lib/ensure-clinic-profile";
+import {
+  resolvePublicSupabaseKey,
+  resolvePublicSupabaseUrl,
+} from "@/lib/supabase-public-config";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/login")({
@@ -22,6 +27,27 @@ export const Route = createFileRoute("/login")({
   }),
   component: LoginPage,
 });
+
+function signInErrorMessage(err: unknown): string {
+  const status = (err as { status?: number })?.status;
+  const raw = err instanceof Error ? err.message : String(err ?? "");
+  if (
+    status === 400 ||
+    /invalid login credentials|invalid email or password|invalid login/i.test(raw)
+  ) {
+    return "Incorrect email or password.";
+  }
+  if (/failed to fetch|networkerror|load failed|could not resolve|err_name_not_resolved/i.test(raw)) {
+    let host = "the clinic database";
+    try {
+      host = new URL(resolvePublicSupabaseUrl()).hostname;
+    } catch {
+      /* ignore */
+    }
+    return `Cannot reach ${host}. Hard-refresh this page (Ctrl+Shift+R). If you use the live website, wait for the latest deploy to finish, or sign in at http://localhost:8080 while developing locally.`;
+  }
+  return raw || "Sign-in failed.";
+}
 
 function LoginPage() {
   const navigate = useNavigate();
@@ -42,6 +68,43 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [connectionNotice, setConnectionNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const url = resolvePublicSupabaseUrl();
+    const key = resolvePublicSupabaseKey();
+    if (!url || !key) {
+      setConnectionNotice("Supabase settings are missing in this build.");
+      return;
+    }
+    void fetch(`${url}/auth/v1/settings`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    })
+      .then((res) => {
+        if (cancelled) return;
+        if (!res.ok) {
+          setConnectionNotice(`Clinic database returned an error (${res.status}). Check Supabase project status.`);
+        } else {
+          setConnectionNotice(null);
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        let host = url;
+        try {
+          host = new URL(url).hostname;
+        } catch {
+          /* ignore */
+        }
+        setConnectionNotice(
+          `This page cannot reach ${host}. Hard-refresh (Ctrl+Shift+R) or use http://localhost:8080 if you are developing locally.`,
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const signInMutation = useMutation({
     mutationFn: async () => {
@@ -61,22 +124,14 @@ function LoginPage() {
       });
 
       if (error) throw error;
+      await ensureClinicProfileForSession();
       return data;
     },
     onSuccess: () => {
       navigate({ to: destination, replace: true });
     },
     onError: (err) => {
-      const raw = err instanceof Error ? err.message : "";
-      if (raw.toLowerCase().includes("invalid login")) {
-        setErrorMessage("Incorrect email or password.");
-        return;
-      }
-      if (/failed to fetch|networkerror|load failed|err_name_not_resolved/i.test(raw)) {
-        setErrorMessage("The clinic database could not be reached. Refresh and try again.");
-        return;
-      }
-      setErrorMessage(raw || "Invalid email or password.");
+      setErrorMessage(signInErrorMessage(err));
     },
   });
 
@@ -99,6 +154,12 @@ function LoginPage() {
         {sessionNotice ? (
           <p role="status" className="text-sm text-ink-500">
             {sessionNotice}
+          </p>
+        ) : null}
+
+        {connectionNotice ? (
+          <p role="status" className="text-sm text-warning-text">
+            {connectionNotice}
           </p>
         ) : null}
 
