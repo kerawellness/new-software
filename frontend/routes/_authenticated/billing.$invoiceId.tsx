@@ -46,6 +46,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/use-session";
 import { friendlyError, logAudit } from "@/lib/audit";
 import { PAYMENT_METHOD_LABELS, PAYMENT_METHODS } from "@/lib/constants";
+import { mergeClinicForBill } from "@/lib/clinic-identity";
 import { addMonthsLocalISO, formatCurrency, formatDate, todayISO } from "@/lib/format";
 import { recordInvoicePayment } from "@/services/record-payment";
 import {
@@ -397,7 +398,7 @@ function InvoiceDetailPage() {
     );
 
   const { invoice, items, payments, installmentPlan } = data;
-  const clinic = invoice.clinics;
+  const clinic = mergeClinicForBill(invoice.clinics, profile?.clinic);
   const patient = invoice.patients;
 
   const nextDueDate =

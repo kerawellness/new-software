@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { EmptyState, ErrorState, LoadingCards } from "@/components/common/states";
 import { InvoiceBillFitFrame, InvoiceBillTemplate } from "@/components/billing/invoice-bill-template";
 import { AppShell, PageHeader } from "@/components/layout/app-shell";
+import { resolveClinicLogoUrl } from "@/lib/brand";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -254,7 +255,7 @@ function SettingsPage() {
       if (!isPatientPhone(phone)) throw new Error("Enter a 10-digit phone number.");
       if (!profile?.clinic_id) throw new Error("Clinic profile not ready.");
 
-      const { error } = await supabase
+      const { data: updatedClinic, error } = await supabase
         .from("clinics")
         .update({
           name: clinicName.trim(),
@@ -267,9 +268,14 @@ function SettingsPage() {
           tax_rate: taxEnabled ? Number(taxRate) : 0,
           tax_label: taxLabel.trim() || "GST",
         })
-        .eq("id", profile.clinic_id);
+        .eq("id", profile.clinic_id)
+        .select("id")
+        .maybeSingle();
 
       if (error) throw error;
+      if (!updatedClinic) {
+        throw new Error("Clinic settings were not saved. Sign out and sign in again, then retry.");
+      }
 
       const trimmedName = yourName.trim();
       if (trimmedName.length < 2) throw new Error("Enter your name.");
@@ -287,6 +293,8 @@ function SettingsPage() {
       toast.success(`"${clinicName.trim()}" clinic settings saved.`);
       void qc.invalidateQueries({ queryKey: ["clinic-settings"] });
       void qc.invalidateQueries({ queryKey: ["profile"] });
+      void qc.invalidateQueries({ queryKey: ["invoice"] });
+      void qc.invalidateQueries({ queryKey: ["invoice-bill-preview"] });
     },
     onError: (err) => toast.error(friendlyError(err, "Unable to save clinic settings.")),
   });
@@ -629,8 +637,18 @@ function SettingsPage() {
                   ) : null}
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  JPG, PNG, or PDF. Shown on printed and shared invoices.
+                  JPG, PNG, or PDF. Shown on printed and shared invoices. If empty, the default VSP logo
+                  is used.
                 </p>
+                {!logoUrl.trim() || !isPdfLogoPreview(logoUrl) ? (
+                  <img
+                    src={resolveClinicLogoUrl(logoUrl)}
+                    alt="Invoice logo preview"
+                    className="mt-2 h-14 w-14 rounded-lg object-contain shadow-xs"
+                  />
+                ) : (
+                  <p className="mt-2 text-xs text-muted-foreground">PDF logo selected for invoices.</p>
+                )}
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -1235,4 +1253,9 @@ function SettingsPage() {
       </Dialog>
     </AppShell>
   );
+}
+
+function isPdfLogoPreview(url: string) {
+  const value = url.trim().toLowerCase();
+  return value.startsWith("data:application/pdf") || value.endsWith(".pdf");
 }

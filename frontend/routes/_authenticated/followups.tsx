@@ -57,10 +57,10 @@ import { getDemoFollowUps, isDemoId } from "@/lib/demo-data";
 import { splitPreviousDue } from "@/lib/followup-previous-date";
 import { formatDate, formatDayMonth, todayISO } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { fetchFollowUpsList } from "@/lib/followups-list-query";
 import {
   completeFollowUp as completeFollowUpRequest,
   createFollowUp as createFollowUpRequest,
-  listFollowUps,
   rescheduleFollowUp as rescheduleFollowUpRequest,
 } from "@/services/followups";
 
@@ -187,11 +187,12 @@ function FollowUpsPage() {
     enabled: !!profile?.clinic_id,
     placeholderData: keepPreviousData,
     queryFn: () =>
-      listFollowUps({
+      fetchFollowUpsList({
+        clinicId: profile!.clinic_id,
         viewFilter,
         dateScope,
         sortOrder,
-        search: "",
+        today: todayISO(),
       }),
   });
 

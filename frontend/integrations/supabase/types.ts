@@ -1365,6 +1365,7 @@ export type Database = {
     }
     Functions: {
       current_clinic_id: { Args: never; Returns: string }
+      ensure_auth_user_clinic: { Args: never; Returns: Json }
       ensure_self_admin: { Args: never; Returns: undefined }
       has_role: {
         Args: {
@@ -1375,6 +1376,58 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       next_patient_code: { Args: { _prefix?: string }; Returns: string }
+      record_invoice_payment: {
+        Args: {
+          _invoice_id: string
+          _patient_id: string
+          _amount: number
+          _payment_method: string
+          _payment_date: string
+          _reference?: string | null
+          _notes?: string | null
+          _target_installment?: Json | null
+          _skip_audit?: boolean
+        }
+        Returns: Json
+      }
+      save_new_patient: {
+        Args: {
+          _full_name: string
+          _phone: string
+          _email?: string | null
+          _date_of_birth?: string | null
+          _gender?: string | null
+          _address?: string | null
+          _emergency_contact?: string | null
+          _patient_type?: string | null
+          _conditions?: Json
+          _allergies?: Json
+          _medications?: Json
+          _habits?: Json
+          _case_note?: string | null
+        }
+        Returns: Json
+      }
+      save_quick_entry: {
+        Args: {
+          _full_name: string
+          _phone: string
+          _gender: string
+          _conditions?: Json
+          _allergies?: Json
+          _medications?: Json
+          _habits?: Json
+          _doctor_notes?: string | null
+          _clinical_notes?: string | null
+          _treatment_label?: string | null
+          _treatments?: Json
+          _invoice_items?: Json
+          _payment_amount?: number
+          _payment_method?: string
+          _visit_date?: string
+        }
+        Returns: Json
+      }
       replace_patient_medical_profile: {
         Args: {
           p_patient_id: string

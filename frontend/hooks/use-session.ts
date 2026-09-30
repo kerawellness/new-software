@@ -5,6 +5,7 @@ import type { Session } from "@supabase/supabase-js";
 import type { ClinicProfile } from "@backend/models/session";
 import { supabase } from "@/integrations/supabase/client";
 import { clearShowDemoData } from "@/lib/demo-data";
+import { ensureClinicProfileForSession } from "@/lib/ensure-clinic-profile";
 import { failIfOffline, isBrowserOffline, withNetworkTimeout } from "@/lib/network";
 import { clearPersistedQueryCache } from "@/lib/query-persist";
 
@@ -22,14 +23,11 @@ export function useSession() {
   const qc = useQueryClient();
 
   useEffect(() => {
-    let mounted = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setSession(data.session);
-      setLoading(false);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, next) => {
       setSession(next);
+      setLoading(false);
       if (event === "SIGNED_OUT") {
         clearShowDemoData();
         clearPersistedQueryCache();
@@ -39,8 +37,7 @@ export function useSession() {
       }
     });
     return () => {
-      mounted = false;
-      sub.subscription.unsubscribe();
+      subscription.unsubscribe();
     };
   }, [qc]);
 
@@ -78,27 +75,36 @@ export function useProfile(enabled = true) {
           const uid = await getSessionUserId();
           if (!uid) return null;
 
-          const { data: profile, error } = await supabase
-            .from("profiles")
-            .select(
-              "id, clinic_id, name, email, avatar_url, clinics(id, name, phone, email, address, patient_code_prefix, tax_enabled, tax_rate, tax_label, currency)",
-            )
-            .eq("id", uid)
-            .maybeSingle();
+          const loadProfile = async () => {
+            const { data: profile, error } = await supabase
+              .from("profiles")
+              .select(
+                "id, clinic_id, name, email, avatar_url, clinics(id, name, phone, email, address, logo_url, patient_code_prefix, tax_enabled, tax_rate, tax_label, currency)",
+              )
+              .eq("id", uid)
+              .maybeSingle();
 
-          if (error) throw error;
-          if (!profile?.clinic_id) return null;
+            if (error) throw error;
+            if (!profile?.clinic_id) return null;
 
-          const clinic = (profile as { clinics: ClinicProfile["clinic"] }).clinics ?? null;
-          return {
-            id: profile.id,
-            clinic_id: profile.clinic_id,
-            name: profile.name,
-            email: profile.email,
-            avatar_url: profile.avatar_url,
-            roles: ["admin"],
-            clinic,
+            const clinic = (profile as { clinics: ClinicProfile["clinic"] }).clinics ?? null;
+            return {
+              id: profile.id,
+              clinic_id: profile.clinic_id,
+              name: profile.name,
+              email: profile.email,
+              avatar_url: profile.avatar_url,
+              roles: ["admin"],
+              clinic,
+            } satisfies ClinicProfile;
           };
+
+          let loaded = await loadProfile();
+          if (!loaded) {
+            await ensureClinicProfileForSession();
+            loaded = await loadProfile();
+          }
+          return loaded;
         })(),
       ),
   });

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useBrowserOffline, useProfile, useSession } from "@/hooks/use-session";
 import { supabase } from "@/integrations/supabase/client";
 import { markMissedAppointmentsNoShowOnce } from "@/lib/mark-missed-appointments";
+import { ensureClinicProfileForSession } from "@/lib/ensure-clinic-profile";
 import { isConnectionFailure } from "@/lib/network";
 import { warmClinicLists } from "@/lib/warm-clinic-data";
 
@@ -100,11 +101,24 @@ function AuthenticatedLayout() {
         <div className="surface-card max-w-sm space-y-3 p-6 text-center">
           <h1 className="text-lg font-semibold">Access unavailable</h1>
           <p className="text-sm text-muted-foreground">
-            This sign-in is not linked to a clinic profile.
+            This sign-in is not linked to a clinic profile yet. Run{" "}
+            <code className="text-xs">04-fix-auth-login.sql</code> in Supabase once, or tap Fix
+            access below.
           </p>
-          <Button variant="outline" onClick={() => void supabase.auth.signOut()}>
-            Sign out
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                await ensureClinicProfileForSession();
+                void profileQuery.refetch();
+              }}
+            >
+              Fix access
+            </Button>
+            <Button variant="outline" onClick={() => void supabase.auth.signOut()}>
+              Sign out
+            </Button>
+          </div>
         </div>
       </div>
     );

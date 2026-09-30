@@ -125,7 +125,31 @@ WITH checks (ord, item, ok) AS (
         AND pg_get_functiondef(p.oid) ILIKE '%IF _clinic IS NULL THEN%'
     )),
     (34, 'only one clinic', (SELECT count(*) FROM public.clinics) <= 1),
-    (35, 'every login uses that clinic', (SELECT count(DISTINCT clinic_id) FROM public.profiles) <= 1)
+    (35, 'every login uses that clinic', (SELECT count(DISTINCT clinic_id) FROM public.profiles) <= 1),
+    (36, 'function save_new_patient', EXISTS (
+      SELECT 1 FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+      WHERE n.nspname = 'public' AND p.proname = 'save_new_patient'
+    )),
+    (37, 'function save_quick_entry', EXISTS (
+      SELECT 1 FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+      WHERE n.nspname = 'public' AND p.proname = 'save_quick_entry'
+    )),
+    (38, 'function record_invoice_payment', EXISTS (
+      SELECT 1 FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+      WHERE n.nspname = 'public' AND p.proname = 'record_invoice_payment'
+    )),
+    (39, 'function ensure_auth_user_clinic', EXISTS (
+      SELECT 1 FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+      WHERE n.nspname = 'public' AND p.proname = 'ensure_auth_user_clinic'
+    )),
+    (40, 'policy own_profile_select', EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = 'profiles' AND policyname = 'own_profile_select'
+    ))
 )
 SELECT ord, item, CASE WHEN ok THEN 'PASS' ELSE 'FAIL' END AS result
 FROM checks

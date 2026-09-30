@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router"
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { ClinicLogo } from "@/components/common/clinic-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -146,8 +147,9 @@ function LoginPage() {
         <ThemeToggle />
       </div>
       <div className="w-full max-w-sm space-y-8">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-ink-900">VSP Software</h1>
+        <div className="flex flex-col items-center text-center">
+          <ClinicLogo className="size-16 rounded-2xl shadow-sm" />
+          <h1 className="mt-4 text-xl font-semibold tracking-tight text-ink-900">VSP Software</h1>
           <p className="mt-1 text-sm text-ink-500">Sign in</p>
         </div>
 

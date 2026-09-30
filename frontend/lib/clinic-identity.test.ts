@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { clinicDoctorNames, composeClinicAddress, parseClinicBillExtras } from "./clinic-identity";
+import {
+  clinicDoctorNames,
+  composeClinicAddress,
+  mergeClinicForBill,
+  parseClinicBillExtras,
+} from "./clinic-identity";
 
 describe("clinic bill extras on address", () => {
   it("round-trips GSTIN and UPI without changing the street line", () => {
@@ -44,6 +49,41 @@ describe("clinic bill extras on address", () => {
       upi: "",
       doctor1: "",
       doctor2: "",
+    });
+  });
+
+  it("reads GST NO label and bare GSTIN values in the address block", () => {
+    expect(parseClinicBillExtras("12 MG Road\nGST NO: 29ABCDE1234F1Z5")).toEqual({
+      address: "12 MG Road",
+      gstin: "29ABCDE1234F1Z5",
+      upi: "",
+      doctor1: "",
+      doctor2: "",
+    });
+    expect(parseClinicBillExtras("GSTIN 29ABCDE1234F1Z5")).toEqual({
+      address: "GSTIN 29ABCDE1234F1Z5",
+      gstin: "29ABCDE1234F1Z5",
+      upi: "",
+      doctor1: "",
+      doctor2: "",
+    });
+  });
+
+  it("prefers live clinic address from profile over stale invoice embed", () => {
+    expect(
+      mergeClinicForBill(
+        { name: "Old Name", address: "Old Street" },
+        { address: "New Street\nGSTIN: 29ABCDE1234F1Z5" },
+      ),
+    ).toEqual({
+      name: "Old Name",
+      address: "New Street\nGSTIN: 29ABCDE1234F1Z5",
+      phone: undefined,
+      email: undefined,
+      logo_url: undefined,
+      tax_enabled: undefined,
+      tax_label: undefined,
+      tax_rate: undefined,
     });
   });
 });

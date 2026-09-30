@@ -3,6 +3,10 @@ import { createMiddleware } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from './types'
+import {
+  resolveServerSupabasePublishableKey,
+  resolveServerSupabaseUrl,
+} from '@/lib/supabase-server-config'
 
 
 
@@ -33,9 +37,8 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server(
   async ({ next }) => {
     
-    const SUPABASE_URL = __VSP_SUPABASE_URL__ || process.env.SUPABASE_URL;
-    const SUPABASE_PUBLISHABLE_KEY =
-      __VSP_SUPABASE_PUBLISHABLE_KEY__ || process.env.SUPABASE_PUBLISHABLE_KEY;
+    const SUPABASE_URL = resolveServerSupabaseUrl();
+    const SUPABASE_PUBLISHABLE_KEY = resolveServerSupabasePublishableKey();
 
     if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
       const missing = [
@@ -90,20 +93,19 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
       }
     );
 
-    const { data, error } = await supabase.auth.getClaims(token);
-    if (error || !data?.claims) {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser(token);
+    if (error || !user) {
       throw new Error('Unauthorized: Invalid token');
-    }
-
-    if (!data.claims.sub) {
-      throw new Error('Unauthorized: No user ID found in token');
     }
 
     return next({
       context: {
         supabase,
-        userId: data.claims.sub,
-        claims: data.claims,
+        userId: user.id,
+        claims: { sub: user.id },
       },
     });
   },

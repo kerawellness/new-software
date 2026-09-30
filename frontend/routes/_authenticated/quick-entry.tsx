@@ -14,8 +14,9 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { AppShell, PageHeader } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
@@ -46,9 +47,7 @@ import { clinicDoctorNames } from "@/lib/clinic-identity";
 import { catalogueOptionLabel, formatCurrency, isPatientPhone, patientPhoneDigits, todayISO, whatsappLink } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { nextSharedPhone, splitFamilyPhone } from "@/lib/family-phone";
-import { createInvoiceWithItems } from "@/services/invoices";
 import { familyPhonesForBase, findPatientsByPhone } from "@/services/patients";
-import { recordInvoicePayment } from "@/services/record-payment";
 
 export const Route = createFileRoute("/_authenticated/quick-entry")({
   head: () => ({
@@ -193,7 +192,6 @@ function QuickEntryPage() {
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [savePhoneOverride, setSavePhoneOverride] = useState<string | null>(null);
   const [noKnownAllergies, setNoKnownAllergies] = useState(false);
-  const qeSaveCheckpoint = useRef<{ patientId?: string; patientCode?: string; step?: string }>({});
 
   const cleanPhoneForCheck = patientPhoneDigits(phone);
   const duplicates = useQuery({
@@ -284,7 +282,6 @@ function QuickEntryPage() {
   const submitQuickEntry = useMutation({
     mutationFn: async () => {
       setFieldError(null);
-      qeSaveCheckpoint.current = {};
       console.log("[QuickEntry] Mutation started");
       if (!fullName.trim() || fullName.trim().length < 2) {
         console.warn("[QuickEntry] Validation failed: full name is required");
@@ -319,192 +316,14 @@ function QuickEntryPage() {
           ? previewSharedPhone
           : cleanPhone);
 
-      const failAfter = (step: string, err: unknown): Error => {
+      const failAfter = (err: unknown): Error => {
         const reason = friendlyError(err, "Unknown error — check connection and try again.");
-        const cp = qeSaveCheckpoint.current;
-        if (cp.patientId && cp.patientCode) {
-          return new Error(
-            `Unable to save: ${reason} Patient ${cp.patientCode} was already created before this failed (${step} step). Open their chart to finish visit, treatments, or billing — do not press Complete again for the same person.`,
-          );
-        }
         return new Error(`Unable to save: ${reason}`);
       };
 
       try {
-      // 1. Generate patient code
-      const { data: code, error: codeErr } = await supabase.rpc("next_patient_code");
-      if (codeErr) throw codeErr;
-
-      // 2. Insert Patient. A used mobile is saved as the next family line (+1, +2).
-      const insertPatient = (patientCode: string, phoneNumber: string) =>
-        supabase
-          .from("patients")
-          .insert({
-            clinic_id,
-            patient_code: patientCode,
-            full_name: fullName.trim(),
-            phone: phoneNumber,
-            gender,
-            patient_type: "walk_in",
-            created_by: profile.id,
-          })
-          .select("id, patient_code, full_name")
-          .single();
-
-      const duplicateKind = (err: { code?: string; message?: string; details?: string } | null) => {
-        if (!err) return null;
-        const text = `${err.message ?? ""} ${err.details ?? ""}`;
-        if (err.code !== "23505" && !text.includes("duplicate key")) return null;
-        return text.includes("phone") ? "phone" : "other";
-      };
-
-      let patientCode = code as string;
-      let phoneUsed = phoneToSave;
-      let inserted = await insertPatient(patientCode, phoneUsed);
-      if (duplicateKind(inserted.error) === "other") {
-        const retry = await supabase.rpc("next_patient_code");
-        if (retry.error) throw retry.error;
-        patientCode = retry.data as string;
-        inserted = await insertPatient(patientCode, phoneUsed);
-      }
-      for (let attempt = 0; duplicateKind(inserted.error) === "phone" && attempt < 5; attempt += 1) {
-        const found = await findPatientsByPhone(clinic_id, cleanPhone);
-        const taken = found.map((row) => row.phone).concat(phoneUsed);
-        phoneUsed = nextSharedPhone(cleanPhone, taken);
-        inserted = await insertPatient(patientCode, phoneUsed);
-      }
-      if (inserted.error) throw inserted.error;
-      const patient = inserted.data;
-      if (!patient) throw new Error("Unable to save the patient.");
-
-      const patient_id = patient.id;
-      qeSaveCheckpoint.current = {
-        patientId: patient_id,
-        patientCode: patient.patient_code,
-        step: "patient",
-      };
-
-      // 3. Insert Medical Records
-      const conditionInserts = [];
-      if (hasHypertension) conditionInserts.push({ clinic_id, patient_id, condition: "Hypertension", notes: "Added via Quick Entry" });
-      if (hasDiabetes) conditionInserts.push({ clinic_id, patient_id, condition: "Diabetes", notes: "Added via Quick Entry" });
-      if (hasAsthma) conditionInserts.push({ clinic_id, patient_id, condition: "Asthma", notes: "Added via Quick Entry" });
-      if (hasHeartDisease) conditionInserts.push({ clinic_id, patient_id, condition: "Heart Disease", notes: "Added via Quick Entry" });
-      if (otherConditions.trim()) conditionInserts.push({ clinic_id, patient_id, condition: otherConditions.trim(), notes: "Added via Quick Entry" });
-      for (const item of dentalHistory) {
-        conditionInserts.push({
-          clinic_id,
-          patient_id,
-          condition: item,
-          category: "Dental History",
-          notes: "Added via Quick Entry",
-        });
-      }
-      if (dentalHistoryNotes.trim()) {
-        conditionInserts.push({
-          clinic_id,
-          patient_id,
-          condition: dentalHistoryNotes.trim(),
-          category: "Dental History",
-          notes: "Added via Quick Entry",
-        });
-      }
-
-      if (conditionInserts.length) {
-        qeSaveCheckpoint.current = { ...qeSaveCheckpoint.current, step: "medical history" };
-      }
-
-      const medicalWrites: Promise<void>[] = [];
-      if (conditionInserts.length) {
-        medicalWrites.push(
-          (async () => {
-            const { error: condErr } = await supabase
-              .from("medical_conditions")
-              .insert(conditionInserts);
-            if (condErr) throw condErr;
-          })(),
-        );
-      }
-      if (allergySubstance.trim()) {
-        medicalWrites.push(
-          (async () => {
-            const { error: allergyErr } = await supabase.from("allergies").insert({
-              clinic_id,
-              patient_id,
-              substance: allergySubstance.trim(),
-              notes: "Added via Quick Entry",
-            });
-            if (allergyErr) throw allergyErr;
-          })(),
-        );
-      }
-      if (currentMedication.trim()) {
-        medicalWrites.push(
-          (async () => {
-            const { error: medErr } = await supabase.from("medications").insert({
-              clinic_id,
-              patient_id,
-              medication: currentMedication.trim(),
-              notes: "Added via Quick Entry",
-            });
-            if (medErr) throw medErr;
-          })(),
-        );
-      }
-      const habitInserts = [];
-      if (selectedHabit === "smoking" || selectedHabit === "both") {
-        habitInserts.push({ clinic_id, patient_id, habit: "Smoking" });
-      }
-      if (selectedHabit === "alcohol" || selectedHabit === "both") {
-        habitInserts.push({ clinic_id, patient_id, habit: "Alcohol" });
-      }
-      if (habitInserts.length) {
-        medicalWrites.push(
-          (async () => {
-            const { error: habitErr } = await supabase.from("patient_habits").insert(habitInserts);
-            if (habitErr) throw habitErr;
-          })(),
-        );
-      }
-      if (medicalWrites.length) await Promise.all(medicalWrites);
-
-      // 4. Create Clinical Visit (done) & Completed Treatment
       const namedTreatments = treatmentLines.filter((line) => line.name.trim());
       const treatmentLabel = namedTreatments.map((line) => line.name.trim()).join(", ");
-      const { data: visit, error: vErr } = await supabase
-        .from("visits")
-        .insert({
-          clinic_id,
-          patient_id,
-          doctor_id: profile.id,
-          doctor_notes: attendingDoctor.trim() || null,
-          visit_date: todayISO(),
-          chief_complaint: treatmentLabel || null,
-          treatment_performed: treatmentLabel || null,
-          clinical_notes: notes.trim() || "Walk-in treatment recorded.",
-        })
-        .select("id")
-        .single();
-      if (vErr) throw vErr;
-      qeSaveCheckpoint.current = { ...qeSaveCheckpoint.current, step: "visit" };
-
-      if (namedTreatments.length) {
-        const { error: tErr } = await supabase.from("treatments").insert(
-          namedTreatments.map((line) => ({
-            clinic_id,
-            patient_id,
-            visit_id: visit.id,
-            name: line.name.trim(),
-            status: "completed" as const,
-            treatment_date: todayISO(),
-            cost: money(Math.max(0, Number(line.cost) || 0)),
-            notes: "Recorded via Quick Entry Flow",
-          })),
-        );
-        if (tErr) throw tErr;
-      }
-
-      // 5. Create Invoice & Payment
       const lineSubtotal = treatmentsSubtotal(treatmentLines);
       const invoiceItems = invoiceItemsFromLines(treatmentLines);
       const bill = payableFromNet(
@@ -512,67 +331,107 @@ function QuickEntryPage() {
         Boolean(profile.clinic?.tax_enabled),
         profile.clinic?.tax_enabled ? Number(profile.clinic.tax_rate ?? 0) : 0,
       );
-      let pAmt = money(Math.max(0, Number(paymentAmount) || 0));
+      const pAmt = money(Math.max(0, Number(paymentAmount) || 0));
       if (pAmt > bill.grand + 0.001) {
         throw new Error("Payment cannot exceed balance due.");
       }
-
-      let invoiceNumber: string | null = null;
-      if (invoiceItems.length) {
-        qeSaveCheckpoint.current = { ...qeSaveCheckpoint.current, step: "invoice or payment" };
-        const invoice = await createInvoiceWithItems({
-          invoiceDate: todayISO(),
-          notes: "Auto-generated via Quick Entry Flow",
-          patientId: patient_id,
-          items: invoiceItems,
-        });
-        invoiceNumber = invoice.invoice_number;
-
-        if (pAmt > 0) {
-          await recordInvoicePayment({
-            clinicId: clinic_id,
-            recordedBy: profile.id,
-            invoiceId: invoice.id,
-            invoiceNumber: invoice.invoice_number,
-            patientId: patient_id,
-            patientName: patient.full_name,
-            balanceAmount: bill.grand,
-            amount: pAmt,
-            paymentMethod,
-            notes: "Recorded via Quick Entry Flow",
-          });
-        }
-      } else if (pAmt > 0) {
+      if (!invoiceItems.length && pAmt > 0) {
         throw new Error("Payment cannot exceed balance due.");
       }
 
-      // Audit in background — do not block the confirmation screen.
-      void logAudit(clinic_id, "quick_entry_express", "patient", patient_id, {
+      const conditionInserts: { condition: string; category?: string; notes: string }[] = [];
+      if (hasHypertension) conditionInserts.push({ condition: "Hypertension", notes: "Added via Quick Entry" });
+      if (hasDiabetes) conditionInserts.push({ condition: "Diabetes", notes: "Added via Quick Entry" });
+      if (hasAsthma) conditionInserts.push({ condition: "Asthma", notes: "Added via Quick Entry" });
+      if (hasHeartDisease) conditionInserts.push({ condition: "Heart Disease", notes: "Added via Quick Entry" });
+      if (otherConditions.trim()) {
+        conditionInserts.push({ condition: otherConditions.trim(), notes: "Added via Quick Entry" });
+      }
+      for (const item of dentalHistory) {
+        conditionInserts.push({
+          condition: item,
+          category: "Dental History",
+          notes: "Added via Quick Entry",
+        });
+      }
+      if (dentalHistoryNotes.trim()) {
+        conditionInserts.push({
+          condition: dentalHistoryNotes.trim(),
+          category: "Dental History",
+          notes: "Added via Quick Entry",
+        });
+      }
+
+      const habits = [];
+      if (selectedHabit === "smoking" || selectedHabit === "both") habits.push({ habit: "Smoking" });
+      if (selectedHabit === "alcohol" || selectedHabit === "both") habits.push({ habit: "Alcohol" });
+
+      const { data, error } = await supabase.rpc("save_quick_entry", {
+        _full_name: fullName.trim(),
+        _phone: phoneToSave,
+        _gender: gender,
+        _conditions: conditionInserts,
+        _allergies: allergySubstance.trim()
+          ? [{ substance: allergySubstance.trim(), notes: "Added via Quick Entry" }]
+          : [],
+        _medications: currentMedication.trim()
+          ? [{ medication: currentMedication.trim(), notes: "Added via Quick Entry" }]
+          : [],
+        _habits: habits,
+        _doctor_notes: attendingDoctor.trim() || null,
+        _clinical_notes: notes.trim() || null,
+        _treatment_label: treatmentLabel || null,
+        _treatments: namedTreatments.map((line) => ({
+          name: line.name.trim(),
+          cost: money(Math.max(0, Number(line.cost) || 0)),
+        })),
+        _invoice_items: invoiceItems,
+        _payment_amount: pAmt,
+        _payment_method: paymentMethod,
+        _visit_date: todayISO(),
+      });
+      if (error) throw error;
+
+      const patient = z
+        .object({
+          id: z.string().uuid(),
+          patient_code: z.string().min(1),
+          full_name: z.string().min(1),
+          invoice_number: z.string().nullable().optional(),
+          tax: z.coerce.number(),
+          cost: z.coerce.number(),
+          paid: z.coerce.number(),
+        })
+        .parse(data);
+
+      void logAudit(clinic_id, "quick_entry_express", "patient", patient.id, {
         patient_code: patient.patient_code,
         full_name: patient.full_name,
         treatment: treatmentLabel || null,
         subtotal: lineSubtotal,
-        cost: bill.grand,
-        paid: pAmt,
-        method: pAmt > 0 ? paymentMethod : null,
-        invoice_number: invoiceNumber,
+        cost: patient.cost,
+        paid: patient.paid,
+        method: patient.paid > 0 ? paymentMethod : null,
+        invoice_number: patient.invoice_number ?? null,
       });
 
       return {
         patient,
         treatment: treatmentLabel,
-        tax: bill.tax,
-        cost: bill.grand,
-        paid: pAmt,
+        tax: patient.tax,
+        cost: patient.cost,
+        paid: patient.paid,
         method: paymentMethod,
       };
       } catch (err) {
-        if (err instanceof Error && err.message === "This mobile is already on file.") throw err;
-        throw failAfter(qeSaveCheckpoint.current.step ?? "save", err);
+        const message = err instanceof Error ? err.message : "";
+        if (message === "This mobile is already on file." || message.includes("already on file")) {
+          throw new Error("This mobile is already on file.");
+        }
+        throw failAfter(err);
       }
     },
     onSuccess: (result) => {
-      qeSaveCheckpoint.current = {};
       setSavePhoneOverride(null);
       setConfirmation({
         patientId: result.patient.id,

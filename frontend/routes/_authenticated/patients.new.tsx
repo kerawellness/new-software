@@ -139,112 +139,63 @@ function NewPatientPage() {
       }
       if (!profile?.clinic_id) throw new Error("Your clinic profile is not ready yet.");
 
-      const { data: code, error: codeError } = await supabase.rpc("next_patient_code");
-      if (codeError) throw codeError;
-
       const digits = patientPhoneDigits(form.phone);
       const phoneToSave =
         saveWithFamilyPhone && hasPhoneOnFile
           ? previewSharedPhone
           : digits;
 
-      const { data: patient, error } = await supabase
-        .from("patients")
-        .insert({
-          clinic_id: profile.clinic_id,
-          patient_code: code as string,
-          full_name: form.full_name.trim(),
-          phone: phoneToSave,
-          email: form.email || null,
-          date_of_birth: form.date_of_birth || null,
-          gender: form.gender,
-          address: form.address || null,
-          emergency_contact: form.emergency_contact || null,
-          patient_type: form.patient_type,
-          created_by: profile.id,
+      const { data, error } = await supabase.rpc("save_new_patient", {
+        _full_name: form.full_name.trim(),
+        _phone: phoneToSave,
+        _email: form.email || null,
+        _date_of_birth: form.date_of_birth || null,
+        _gender: form.gender,
+        _address: form.address || null,
+        _emergency_contact: form.emergency_contact || null,
+        _patient_type: form.patient_type,
+        _conditions: conditions,
+        _allergies: allergies
+          .filter((a) => a.substance)
+          .map((a) => ({
+            substance: a.substance,
+            reaction: a.reaction || null,
+            severity: a.severity || null,
+            notes: a.notes || null,
+          })),
+        _medications: medications
+          .filter((m) => m.medication)
+          .map((m) => ({
+            medication: m.medication,
+            dosage: m.dosage || null,
+            frequency: m.frequency || null,
+            duration: m.duration || null,
+            notes: m.notes || null,
+          })),
+        _habits: habits
+          .filter((h) => h.habit)
+          .map((h) => ({
+            habit: h.habit,
+            notes: h.notes || null,
+          })),
+        _case_note: caseNote.trim() || null,
+      });
+      if (error) {
+        if (error.message.includes("already on file")) {
+          throw new Error("Enter a different phone. This mobile is already on file.");
+        }
+        throw error;
+      }
+
+      const patient = z
+        .object({
+          id: z.string().uuid(),
+          patient_code: z.string().min(1),
+          full_name: z.string().min(1),
         })
-        .select("id, patient_code, full_name")
-        .single();
-      if (error) throw error;
+        .parse(data);
 
-      const clinic_id = profile.clinic_id;
-      const patient_id = patient.id;
-
-      const inserts: Promise<void>[] = [];
-      if (conditions.length)
-        inserts.push(
-          (async () => {
-            const { error: e } = await supabase
-              .from("medical_conditions")
-              .insert(conditions.map((c) => ({ clinic_id, patient_id, ...c })));
-            if (e) throw e;
-          })(),
-        );
-      if (allergies.length)
-        inserts.push(
-          (async () => {
-            const { error: e } = await supabase.from("allergies").insert(
-              allergies
-                .filter((a) => a.substance)
-                .map((a) => ({
-                  clinic_id,
-                  patient_id,
-                  substance: a.substance,
-                  reaction: a.reaction || null,
-                  severity: a.severity || null,
-                  notes: a.notes || null,
-                })),
-            );
-            if (e) throw e;
-          })(),
-        );
-      if (medications.length)
-        inserts.push(
-          (async () => {
-            const { error: e } = await supabase.from("medications").insert(
-              medications
-                .filter((m) => m.medication)
-                .map((m) => ({
-                  clinic_id,
-                  patient_id,
-                  medication: m.medication,
-                  dosage: m.dosage || null,
-                  frequency: m.frequency || null,
-                  duration: m.duration || null,
-                  notes: m.notes || null,
-                })),
-            );
-            if (e) throw e;
-          })(),
-        );
-      if (habits.length)
-        inserts.push(
-          (async () => {
-            const { error: e } = await supabase.from("patient_habits").insert(
-              habits
-                .filter((h) => h.habit)
-                .map((h) => ({
-                  clinic_id,
-                  patient_id,
-                  habit: h.habit,
-                  notes: h.notes || null,
-                })),
-            );
-            if (e) throw e;
-          })(),
-        );
-      if (caseNote.trim())
-        inserts.push(
-          (async () => {
-            const { error: e } = await supabase
-              .from("case_notes")
-              .insert({ clinic_id, patient_id, note: caseNote.trim(), created_by: profile.id });
-            if (e) throw e;
-          })(),
-        );
-      if (inserts.length) await Promise.all(inserts);
-
-      void logAudit(clinic_id, "patient_created", "patient", patient_id, {
+      void logAudit(profile.clinic_id, "patient_created", "patient", patient.id, {
         patient_code: patient.patient_code,
       });
       return patient;

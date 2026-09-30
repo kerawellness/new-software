@@ -13,6 +13,7 @@ export type ClinicProfile = {
     phone: string | null;
     email: string | null;
     address: string | null;
+    logo_url: string | null;
     patient_code_prefix: string;
     tax_enabled: boolean;
     tax_rate: number;

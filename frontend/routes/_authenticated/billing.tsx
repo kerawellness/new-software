@@ -56,6 +56,7 @@ import { usePatientSearch } from "@/hooks/use-patients-query";
 import { useActiveStaff } from "@/hooks/use-staff-query";
 import { friendlyError, logAudit } from "@/lib/audit";
 import { PAYMENT_METHOD_LABELS, PAYMENT_METHODS } from "@/lib/constants";
+import { mergeClinicForBill } from "@/lib/clinic-identity";
 import {
   addMonthsLocalISO,
   catalogueOptionLabel,
@@ -2116,7 +2117,10 @@ function BillingPage() {
               <InvoiceBillFitFrame className="h-full w-full rounded-lg bg-surface-2">
                 <InvoiceBillTemplate
                   compact
-                  clinic={billPreviewQuery.data.invoice.clinics}
+                  clinic={mergeClinicForBill(
+                    billPreviewQuery.data.invoice.clinics,
+                    profile?.clinic,
+                  )}
                   patient={billPreviewQuery.data.invoice.patients}
                   invoice={billPreviewQuery.data.invoice}
                   items={billPreviewQuery.data.items}

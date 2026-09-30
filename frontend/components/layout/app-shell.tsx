@@ -25,6 +25,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { ClinicLogo } from "@/components/common/clinic-logo";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { useProfile } from "@/hooks/use-session";
 import { initials, todayISO } from "@/lib/format";
@@ -219,9 +220,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Desktop / tablet sidebar */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-line/80 bg-surface-1 px-3 py-4 shadow-xs lg:flex">
         <div className="flex items-center gap-2.5 px-2 pb-5 border-b border-line mb-3">
-          <div className="grid size-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-xs">
-            <Stethoscope className="size-5" aria-hidden />
-          </div>
+          <ClinicLogo className="size-9 shrink-0 rounded-xl shadow-xs" />
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-ink-900">VSP Software</p>
             <p className="truncate text-[11px] font-medium text-ink-500">
@@ -325,9 +324,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-20 border-b border-line/80 bg-surface-1/95 px-3 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur lg:hidden">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground shadow-2xs">
-              <Stethoscope className="size-4" aria-hidden />
-            </div>
+            <ClinicLogo className="size-8 shrink-0 rounded-lg shadow-2xs" />
             <div className="min-w-0">
               <p className="truncate text-sm font-bold leading-tight text-ink-900">
                 VSP Software

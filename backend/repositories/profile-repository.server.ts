@@ -12,7 +12,7 @@ export async function getProfileByUserId(
     db
       .from("profiles")
       .select(
-        "id, clinic_id, name, email, avatar_url, clinics(id, name, phone, email, address, patient_code_prefix, tax_enabled, tax_rate, tax_label, currency)",
+        "id, clinic_id, name, email, avatar_url, clinics(id, name, phone, email, address, logo_url, patient_code_prefix, tax_enabled, tax_rate, tax_label, currency)",
       )
       .eq("id", userId)
       .maybeSingle(),

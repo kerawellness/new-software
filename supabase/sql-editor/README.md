@@ -14,10 +14,12 @@ Open **Supabase → SQL Editor**. Paste one file. Press **Run**.
 **Brand-new empty project**
 
 1. Paste all of `supabase/full-setup-empty-database.sql`. Run once.
-2. **Authentication → Users → Add user** (email + password). The first user creates the clinic. Each later user joins that clinic.
-3. Paste `01-check-after-setup.sql`. Last row must be `PASS — database ready for the app`.
-4. Put that project’s URL and publishable key in `.env`.
-5. Do the 5 tests below.
+2. Paste `supabase/sql-editor/04-fix-auth-login.sql`. Run once (links every Auth user to a clinic profile).
+3. Optionally paste `supabase/sql-editor/03-fast-saves.sql` for faster Quick Entry saves.
+4. **Authentication → Users → Add user** (email + password). The first user creates the clinic. Each later user joins that clinic.
+5. Paste `01-check-after-setup.sql`. Last row must be `PASS — database ready for the app`.
+6. Put that project’s URL and publishable key in `.env`.
+7. Do the 5 tests below.
 
 If the check shows an error like `relation does not exist`, the setup file did not finish.
 

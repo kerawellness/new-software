@@ -1,6 +1,7 @@
 import { Banknote, CreditCard } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
+import { resolveClinicLogoUrl } from "@/lib/brand";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { parseClinicBillExtras } from "@/lib/clinic-identity";
 
@@ -74,6 +75,7 @@ export function InvoiceBillTemplate({
   const taxRate = Number(clinic?.tax_rate ?? 0);
   const showTax = Number(invoice.tax_amount) > 0 || Boolean(clinic?.tax_enabled && taxRate > 0);
   const billExtras = parseClinicBillExtras(clinic?.address);
+  const logoSrc = resolveClinicLogoUrl(clinic?.logo_url);
 
   const contactLine = [
     billExtras.address || null,
@@ -101,13 +103,15 @@ export function InvoiceBillTemplate({
       <div className={pad}>
         <header className={`flex flex-col items-center text-center border-b border-slate-200 ${compact ? "pb-3" : "pb-6"}`}>
           <div className="flex items-center gap-2">
-            {clinic?.logo_url && !isPdfLogo(clinic.logo_url) ? (
+            {!isPdfLogo(logoSrc) ? (
               <img
-                src={clinic.logo_url}
+                src={logoSrc}
                 alt=""
-                className={compact ? "h-7 w-7 object-contain" : "h-10 w-10 object-contain"}
+                className={
+                  compact ? "h-10 w-10 object-contain" : "h-14 w-14 object-contain"
+                }
               />
-            ) : clinic?.logo_url ? (
+            ) : (
               <span
                 className={`grid place-items-center rounded bg-[#0f5c5c] font-semibold text-white ${
                   compact ? "h-7 w-7 text-[8px]" : "h-10 w-10 text-[9px]"
@@ -115,8 +119,6 @@ export function InvoiceBillTemplate({
               >
                 PDF
               </span>
-            ) : (
-              <ToothMark className={compact ? "h-7 w-7" : "h-9 w-9"} />
             )}
             <h1
               className={`font-bold tracking-[0.08em] uppercase text-[#0f5c5c] ${
@@ -135,11 +137,7 @@ export function InvoiceBillTemplate({
             <p className={`text-slate-600 ${compact ? "mt-0.5 text-[10px]" : "mt-1 text-[11px] sm:text-xs"}`}>
               GSTIN: {billExtras.gstin}
             </p>
-          ) : (
-            <p className={`text-amber-800 print:hidden ${compact ? "mt-0.5 text-[10px]" : "mt-1 text-[11px] sm:text-xs"}`}>
-              Add GSTIN in Settings so it appears on printed bills.
-            </p>
-          )}
+          ) : null}
           <p className={`${compact ? "mt-2" : "mt-5"} ${titleSize} font-serif font-semibold tracking-wide text-slate-900`}>
             INVOICE
           </p>
@@ -403,17 +401,4 @@ function TotalRow({
 function isPdfLogo(url: string) {
   const value = url.trim().toLowerCase();
   return value.startsWith("data:application/pdf") || value.endsWith(".pdf");
-}
-
-function ToothMark({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 40 40"
-      className={className ?? "h-9 w-9 text-[#0f5c5c]"}
-      aria-hidden
-      fill="currentColor"
-    >
-      <path d="M20 4c-4.2 0-7.5 2.4-8.8 5.8C9.8 12.8 8 16.2 8 20.2c0 3.4 1.2 6.2 2.8 7.6.9.8 1.7.7 2.2-.3l1.6-3.4c.4-.8 1.2-.8 1.6 0l1.3 2.8c.5 1.1 1.4 1.1 1.9 0l1.3-2.8c.4-.8 1.2-.8 1.6 0l1.6 3.4c.5 1 1.3 1.1 2.2.3C30.8 26.4 32 23.6 32 20.2c0-4-1.8-7.4-3.2-10.4C27.5 6.4 24.2 4 20 4z" />
-    </svg>
-  );
 }

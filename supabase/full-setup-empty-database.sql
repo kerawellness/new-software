@@ -3207,3 +3207,6 @@ BEGIN
   DELETE FROM public.clinics WHERE id <> _clinic;
 END $$;
 
+-- Fast saves (new patient, Quick Entry, payment) are in sql-editor/03-fast-saves.sql.
+-- A brand-new project must run that file once after this one.
+

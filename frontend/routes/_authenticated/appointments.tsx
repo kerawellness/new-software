@@ -471,8 +471,10 @@ function AppointmentsPage() {
       const { data, error } = await supabase
         .from("online_appointment_requests")
         .select("id, status, name, phone, email, message, reason, requested_date, requested_time, created_at")
+        .eq("clinic_id", profile!.clinic_id)
+        .in("status", ["requested", "rejected"])
         .order("created_at", { ascending: false })
-        .limit(40);
+        .limit(200);
       if (error) throw error;
       return data ?? [];
     },
@@ -644,15 +646,18 @@ function AppointmentsPage() {
 
   const dateRange = resolveDateScope(dateScope);
 
-  function onlineRequestMatchesFilters(r: {
-    name: string;
-    phone: string;
-    reason: string | null;
-    message: string | null;
-    requested_date: string | null;
-    created_at: string;
-  }) {
-    if (dateRange) {
+  function onlineRequestMatchesFilters(
+    r: {
+      name: string;
+      phone: string;
+      reason: string | null;
+      message: string | null;
+      requested_date: string | null;
+      created_at: string;
+    },
+    options?: { ignoreDate?: boolean },
+  ) {
+    if (!options?.ignoreDate && dateRange) {
       const day = r.requested_date || r.created_at.slice(0, 10);
       if (day < dateRange.start || day > dateRange.end) return false;
     }
@@ -668,7 +673,7 @@ function AppointmentsPage() {
 
   const pendingOnlineRequests = useMemo(() => {
     return (onlineRequestsQuery.data ?? []).filter(
-      (r) => r.status === "requested" && onlineRequestMatchesFilters(r),
+      (r) => r.status === "requested" && onlineRequestMatchesFilters(r, { ignoreDate: true }),
     );
   }, [onlineRequestsQuery.data, search, dateRange?.start, dateRange?.end]);
 
@@ -964,6 +969,19 @@ function AppointmentsPage() {
           </>
         );
       })()}
+
+      {listView === "schedule" && pendingRequestsCount > 0 ? (
+        <button
+          type="button"
+          onClick={() => setStatusFilter("online_requests")}
+          className="mb-4 flex w-full items-center justify-between gap-3 rounded-xl border border-info-line bg-info-surface px-3 py-2.5 text-left"
+        >
+          <span className="text-sm font-semibold text-info-text">
+            {pendingRequestsCount} online booking{pendingRequestsCount === 1 ? "" : "s"} waiting
+          </span>
+          <span className="text-xs font-semibold text-info-text">Open</span>
+        </button>
+      ) : null}
 
       {/* Online / Rejected lists */}
       {listView === "online" ? (
