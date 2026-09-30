@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { useSession } from "@/hooks/use-session";
 import { supabase } from "@/integrations/supabase/client";
-import { friendlyError } from "@/lib/audit";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -68,8 +67,16 @@ function LoginPage() {
       navigate({ to: destination, replace: true });
     },
     onError: (err) => {
-      const msg = friendlyError(err, "Invalid email or password.");
-      setErrorMessage(msg);
+      const raw = err instanceof Error ? err.message : "";
+      if (raw.toLowerCase().includes("invalid login")) {
+        setErrorMessage("Incorrect email or password.");
+        return;
+      }
+      if (/failed to fetch|networkerror|load failed|err_name_not_resolved/i.test(raw)) {
+        setErrorMessage("The clinic database could not be reached. Refresh and try again.");
+        return;
+      }
+      setErrorMessage(raw || "Invalid email or password.");
     },
   });
 
