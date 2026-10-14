@@ -195,7 +195,7 @@ export function MedicalHistoryPicker({
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
-                {Object.keys(MEDICAL_HISTORY).concat("Other").map((cat) => (
+                {Object.keys(MEDICAL_HISTORY).map((cat) => (
                   <SelectItem key={cat} value={cat}>
                     {cat}
                   </SelectItem>

@@ -1,4 +1,4 @@
-﻿-- Clinic Compass — complete SQL for a brand-new empty Supabase project.
+-- Clinic Compass — complete SQL for a brand-new empty Supabase project.
 -- Paste this whole file into Supabase → SQL Editor and press Run once.
 -- Includes every table, rule, and the one-clinic signup (later logins join the first clinic).
 -- Do NOT run this on a clinic database that already has tables. It will fail on CREATE TABLE.
@@ -154,6 +154,14 @@ CREATE TABLE public.patient_habits (
   clinic_id uuid NOT NULL REFERENCES public.clinics(id) ON DELETE CASCADE,
   patient_id uuid NOT NULL REFERENCES public.patients(id) ON DELETE CASCADE,
   habit text NOT NULL,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE public.patient_dental_history (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id uuid NOT NULL REFERENCES public.clinics(id) ON DELETE CASCADE,
+  patient_id uuid NOT NULL REFERENCES public.patients(id) ON DELETE CASCADE,
+  item text NOT NULL,
   notes text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -448,13 +456,13 @@ END $$;
 DO $$
 DECLARE t text;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['clinics','profiles','user_roles','patients','clinic_counters','medical_conditions','allergies','medications','patient_habits','case_notes','appointments','online_appointment_requests','visits','treatment_catalogue','treatments','care_plans','invoices','invoice_items','payments','installment_plans','installments','follow_ups','whatsapp_templates','motivation_quotes','motivation_acknowledgements','audit_logs'] LOOP
+  FOREACH t IN ARRAY ARRAY['clinics','profiles','user_roles','patients','clinic_counters','medical_conditions','allergies','medications','patient_habits','patient_dental_history','case_notes','appointments','online_appointment_requests','visits','treatment_catalogue','treatments','care_plans','invoices','invoice_items','payments','installment_plans','installments','follow_ups','whatsapp_templates','motivation_quotes','motivation_acknowledgements','audit_logs'] LOOP
     EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO authenticated', t);
     EXECUTE format('GRANT ALL ON public.%I TO service_role', t);
     EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
   END LOOP;
   -- clinic-scoped tables: staff of the clinic can do everything
-  FOREACH t IN ARRAY ARRAY['patients','medical_conditions','allergies','medications','patient_habits','case_notes','appointments','visits','treatments','care_plans','invoices','invoice_items','payments','installment_plans','installments','follow_ups'] LOOP
+  FOREACH t IN ARRAY ARRAY['patients','medical_conditions','allergies','medications','patient_habits','patient_dental_history','case_notes','appointments','visits','treatments','care_plans','invoices','invoice_items','payments','installment_plans','installments','follow_ups'] LOOP
     EXECUTE format($f$CREATE POLICY "clinic_staff_all" ON public.%I FOR ALL TO authenticated USING (clinic_id = public.current_clinic_id()) WITH CHECK (clinic_id = public.current_clinic_id())$f$, t);
   END LOOP;
   -- admin-managed config tables: all staff read, admins write

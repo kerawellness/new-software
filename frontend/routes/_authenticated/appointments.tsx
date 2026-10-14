@@ -1115,7 +1115,7 @@ function AppointmentsPage() {
             const metaRest = [
               phone,
               appt.reason,
-              appt.notes?.match(/^Doctor:\s*(.+)$/m)?.[1]?.trim() ??
+              doctorFromNotes(appt.notes) ||
                 (appt.profiles?.name ? `Dr. ${appt.profiles.name}` : null),
               !appt.patients ? "New patient" : null,
             ]

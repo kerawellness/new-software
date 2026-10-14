@@ -82,6 +82,8 @@ async function replacePatientMedicalProfileSequential(
     );
     throwDb(error);
   }
+
+  await replaceDentalHistory(db, clinicId, patientId, input.dentalHistory);
 }
 
 export async function replacePatientMedicalProfile(
@@ -118,6 +120,7 @@ export async function replacePatientMedicalProfile(
   });
 
   if (!rpcError) {
+    await replaceDentalHistory(db, clinicId, patientId, input.dentalHistory);
     return;
   }
 
@@ -127,4 +130,44 @@ export async function replacePatientMedicalProfile(
   }
 
   throwDb(rpcError);
+}
+
+function isMissingDentalTable(error: { code?: string; message?: string }): boolean {
+  const msg = (error.message ?? "").toLowerCase();
+  return error.code === "42P01" || error.code === "PGRST205" || msg.includes("patient_dental_history");
+}
+
+async function replaceDentalHistory(
+  db: ClinicDb,
+  clinicId: string,
+  patientId: string,
+  rows: ReplacePatientMedicalProfileInput["dentalHistory"],
+): Promise<void> {
+  const { error: deleteError } = await db
+    .from("patient_dental_history")
+    .delete()
+    .eq("patient_id", patientId)
+    .eq("clinic_id", clinicId);
+
+  if (deleteError) {
+    if (isMissingDentalTable(deleteError) && rows.length === 0) return;
+    if (isMissingDentalTable(deleteError)) {
+      throw new Error(
+        "Dental history is not ready yet. Run supabase/sql-editor/07-dental-history.sql in Supabase, then save again.",
+      );
+    }
+    throwDb(deleteError);
+  }
+
+  if (rows.length === 0) return;
+
+  const { error } = await db.from("patient_dental_history").insert(
+    rows.map((row) => ({
+      clinic_id: clinicId,
+      patient_id: patientId,
+      item: row.item,
+      notes: row.notes || null,
+    })),
+  );
+  throwDb(error);
 }

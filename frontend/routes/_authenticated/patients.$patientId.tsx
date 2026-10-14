@@ -85,7 +85,7 @@ import {
   type CollectTargetInstallment,
 } from "@/services/record-payment";
 import { type SelectedCondition } from "@/components/patients/medical-history-picker";
-import { MedicalRecordsForm, type AllergyRow, type MedicationRow, type HabitRow } from "@/components/patients/medical-records-form";
+import { MedicalRecordsForm, type AllergyRow, type MedicationRow, type HabitRow, type DentalHistoryRow } from "@/components/patients/medical-records-form";
 
 const toLocalIsoAtTime = (dateOnly: Date, hours = 10, minutes = 0) => {
   const d = new Date(dateOnly);
@@ -383,19 +383,13 @@ function PatientDetailPage() {
   // Follow-Up Scheduler Form States
   const [schedulerOpen, setSchedulerOpen] = useState(false);
   const [fuMode, setFuMode] = useState<"monthly" | "dates">("monthly");
-  const [fuUntilMonth, setFuUntilMonth] = useState<string>("");
+  const [fuUntilMonth, setFuUntilMonth] = useState(() => getNext12Months()[2]?.key ?? "");
   const [fuDayOfMonth, setFuDayOfMonth] = useState<number>(10);
   const [fuExcludedMonths, setFuExcludedMonths] = useState<string[]>([]);
   const [selectedManualDates, setSelectedManualDates] = useState<string[]>([]);
-  const [calendarViewMonth, setCalendarViewMonth] = useState<string>("");
+  const [calendarViewMonth, setCalendarViewMonth] = useState(() => getNext12Months()[0]?.key ?? "");
 
   const next12Months = useMemo(() => getNext12Months(), []);
-  useEffect(() => {
-    if (next12Months.length > 0) {
-      setFuUntilMonth(next12Months[2]?.key || ""); // Defaults to 3 months from now
-      setCalendarViewMonth(next12Months[0]?.key || ""); // Defaults to current month
-    }
-  }, [next12Months]);
 
   // Unified medical record states for editing
   const [medicalEditOpen, setMedicalEditOpen] = useState(false);
@@ -403,6 +397,7 @@ function PatientDetailPage() {
   const [editAllergies, setEditAllergies] = useState<AllergyRow[]>([]);
   const [editMedications, setEditMedications] = useState<MedicationRow[]>([]);
   const [editHabits, setEditHabits] = useState<HabitRow[]>([]);
+  const [editDentalHistory, setEditDentalHistory] = useState<DentalHistoryRow[]>([]);
 
   const openMedicalEditModal = () => {
     if (!data) return;
@@ -436,6 +431,12 @@ function PatientDetailPage() {
         notes: h.notes || "",
       }))
     );
+    setEditDentalHistory(
+      (data.dentalHistory ?? []).map((row) => ({
+        item: row.item,
+        notes: row.notes || "",
+      })),
+    );
     setMedicalEditOpen(true);
   };
 
@@ -455,13 +456,14 @@ function PatientDetailPage() {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["patient", patientId],
     queryFn: async () => {
-      const [patient, conditions, allergies, medications, habits, appts, visits, treatments, invoices, followups, payments] =
+      const [patient, conditions, allergies, medications, habits, dentalHistory, appts, visits, treatments, invoices, followups, payments] =
         await Promise.all([
           supabase.from("patients").select("*").eq("id", patientId).single(),
           supabase.from("medical_conditions").select("*").eq("patient_id", patientId),
           supabase.from("allergies").select("*").eq("patient_id", patientId),
           supabase.from("medications").select("*").eq("patient_id", patientId),
           supabase.from("patient_habits").select("*").eq("patient_id", patientId),
+          supabase.from("patient_dental_history").select("*").eq("patient_id", patientId),
           supabase
             .from("appointments")
             .select("*, profiles(name)")
@@ -541,6 +543,7 @@ function PatientDetailPage() {
         allergies: allergies.data ?? [],
         medications: medications.data ?? [],
         habits: habits.data ?? [],
+        dentalHistory: dentalHistory.error ? [] : (dentalHistory.data ?? []),
         appointments: appts.data ?? [],
         visits: (visits.data ?? []) as PatientVisitRow[],
         treatments: (treatments.data ?? []) as PatientTreatmentRow[],
@@ -909,6 +912,12 @@ function PatientDetailPage() {
             habit: h.habit,
             notes: h.notes || "",
           })),
+        dentalHistory: editDentalHistory
+          .filter((row) => row.item.trim())
+          .map((row) => ({
+            item: row.item.trim(),
+            notes: row.notes || "",
+          })),
       });
     },
     onSuccess: () => {
@@ -1154,6 +1163,24 @@ function PatientDetailPage() {
                 </div>
               ) : (
                 <Muted>No recorded habits.</Muted>
+              )}
+            </div>
+
+            <div className="surface-card p-4 rounded-xl border space-y-3 md:col-span-2">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Dental History
+              </h4>
+              {(data.dentalHistory ?? []).length ? (
+                <div className="space-y-2">
+                  {(data.dentalHistory ?? []).map((row) => (
+                    <div key={row.id} className="text-xs border-b pb-2 last:border-0 last:pb-0">
+                      <p className="font-semibold text-foreground">{row.item}</p>
+                      {row.notes ? <p className="text-[10px] text-muted-foreground mt-0.5">Notes: {row.notes}</p> : null}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Muted>No dental history recorded.</Muted>
               )}
             </div>
             </div>
@@ -1694,7 +1721,7 @@ function PatientDetailPage() {
           <DialogHeader>
             <DialogTitle>Edit Medical Profile</DialogTitle>
             <DialogDescription>
-              Update patient's medical history, allergies, medications, and habits.
+              Update patient's medical history, allergies, medications, habits, and dental history.
             </DialogDescription>
           </DialogHeader>
 
@@ -1714,6 +1741,8 @@ function PatientDetailPage() {
               onChangeMedications={setEditMedications}
               habits={editHabits}
               onChangeHabits={setEditHabits}
+              dentalHistory={editDentalHistory}
+              onChangeDentalHistory={setEditDentalHistory}
             />
 
             <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t mt-4 flex gap-2 justify-end">

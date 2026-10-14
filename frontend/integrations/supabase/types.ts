@@ -883,6 +883,48 @@ export type Database = {
           },
         ]
       }
+      patient_dental_history: {
+        Row: {
+          clinic_id: string
+          created_at: string
+          id: string
+          item: string
+          notes: string | null
+          patient_id: string
+        }
+        Insert: {
+          clinic_id: string
+          created_at?: string
+          id?: string
+          item: string
+          notes?: string | null
+          patient_id: string
+        }
+        Update: {
+          clinic_id?: string
+          created_at?: string
+          id?: string
+          item?: string
+          notes?: string | null
+          patient_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_dental_history_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_dental_history_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       patient_habits: {
         Row: {
           clinic_id: string

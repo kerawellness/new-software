@@ -124,7 +124,7 @@ export function warmClinicLists(qc: QueryClient, clinicId: string): () => void {
     timer = window.setTimeout(step, slow ? 1200 : 500);
   };
 
-  timer = window.setTimeout(step, slow ? 4000 : 4000);
+  timer = window.setTimeout(step, 4000);
 
   return () => {
     cancelled = true;

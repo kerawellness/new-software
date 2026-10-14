@@ -15,6 +15,7 @@ import {
   ALLERGY_OPTIONS,
   ALLERGY_SEVERITY,
   HABIT_OPTIONS,
+  DENTAL_HISTORY_OPTIONS,
   MEDICATION_OPTIONS,
 } from "@/lib/constants";
 
@@ -38,6 +39,123 @@ export type HabitRow = {
   notes: string;
 };
 
+export type DentalHistoryRow = {
+  item: string;
+  notes: string;
+};
+
+export function DentalHistorySection({
+  dentalHistory,
+  onChangeDentalHistory,
+}: {
+  dentalHistory: DentalHistoryRow[];
+  onChangeDentalHistory: (next: DentalHistoryRow[]) => void;
+}) {
+  const isDentalChecked = (option: string) => dentalHistory.some((row) => row.item === option);
+  const getDentalNotes = (option: string) => dentalHistory.find((row) => row.item === option)?.notes || "";
+  const toggleDental = (option: string) => {
+    if (isDentalChecked(option)) {
+      onChangeDentalHistory(dentalHistory.filter((row) => row.item !== option));
+    } else {
+      onChangeDentalHistory([...dentalHistory, { item: option, notes: "" }]);
+    }
+  };
+  const updateDentalNotes = (option: string, notes: string) => {
+    onChangeDentalHistory(dentalHistory.map((row) => (row.item === option ? { ...row, notes } : row)));
+  };
+  const addCustomDental = () => {
+    onChangeDentalHistory([...dentalHistory, { item: "", notes: "" }]);
+  };
+  const updateCustomDental = (idx: number, fields: Partial<DentalHistoryRow>) => {
+    onChangeDentalHistory(dentalHistory.map((row, i) => (i === idx ? { ...row, ...fields } : row)));
+  };
+  const removeCustomDental = (idx: number) => {
+    onChangeDentalHistory(dentalHistory.filter((_, i) => i !== idx));
+  };
+  const customDental = dentalHistory.filter((row) => !DENTAL_HISTORY_OPTIONS.includes(row.item));
+
+  return (
+    <section className="surface-card p-4 rounded-xl border space-y-4">
+      <h2 className="text-sm font-semibold text-foreground border-b pb-2">Dental History</h2>
+      <div className="space-y-3">
+        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          Previous dental findings
+        </Label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {DENTAL_HISTORY_OPTIONS.map((option) => {
+            const checked = isDentalChecked(option);
+            return (
+              <div
+                key={option}
+                className="flex flex-col gap-1.5 rounded-lg border p-3 bg-muted/5 hover:bg-accent/40"
+              >
+                <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                  <Checkbox checked={checked} onCheckedChange={() => toggleDental(option)} />
+                  {option}
+                </label>
+                {checked ? (
+                  <Input
+                    value={getDentalNotes(option)}
+                    onChange={(e) => updateDentalNotes(option, e.target.value)}
+                    placeholder="Notes"
+                    className="mt-1"
+                  />
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="space-y-3 pt-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Other dental history
+          </Label>
+          <Button type="button" size="sm" variant="outline" onClick={addCustomDental} className="px-2">
+            <Plus className="size-3.5 mr-1" /> Add Custom
+          </Button>
+        </div>
+        {customDental.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No other dental history recorded.</p>
+        ) : (
+          <div className="space-y-2">
+            {dentalHistory.map((row, idx) => {
+              if (DENTAL_HISTORY_OPTIONS.includes(row.item)) return null;
+              return (
+                <div key={idx} className="flex gap-2 items-center bg-muted/5 border rounded-lg p-2.5">
+                  <div className="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
+                    <Input
+                      value={row.item}
+                      onChange={(e) => updateCustomDental(idx, { item: e.target.value })}
+                      placeholder="Finding"
+                      required
+                    />
+                    <Input
+                      value={row.notes}
+                      onChange={(e) => updateCustomDental(idx, { notes: e.target.value })}
+                      placeholder="Notes"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 text-destructive hover:bg-destructive/10"
+                    onClick={() => removeCustomDental(idx)}
+                    aria-label="Remove dental history"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 interface MedicalRecordsFormProps {
   conditions: SelectedCondition[];
   onChangeConditions: (next: SelectedCondition[]) => void;
@@ -47,6 +165,9 @@ interface MedicalRecordsFormProps {
   onChangeMedications: (next: MedicationRow[]) => void;
   habits: HabitRow[];
   onChangeHabits: (next: HabitRow[]) => void;
+  dentalHistory: DentalHistoryRow[];
+  onChangeDentalHistory: (next: DentalHistoryRow[]) => void;
+  showDentalHistory?: boolean;
 }
 
 export function MedicalRecordsForm({
@@ -58,6 +179,9 @@ export function MedicalRecordsForm({
   onChangeMedications,
   habits,
   onChangeHabits,
+  dentalHistory,
+  onChangeDentalHistory,
+  showDentalHistory = true,
 }: MedicalRecordsFormProps) {
   // Allergy helpers
   const addAllergy = () => {
@@ -427,6 +551,12 @@ export function MedicalRecordsForm({
           )}
         </div>
       </section>
+      {showDentalHistory ? (
+        <DentalHistorySection
+          dentalHistory={dentalHistory}
+          onChangeDentalHistory={onChangeDentalHistory}
+        />
+      ) : null}
     </div>
   );
 }

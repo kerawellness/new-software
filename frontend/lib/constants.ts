@@ -107,6 +107,21 @@ export const HABIT_OPTIONS = [
   "Chronic Alcoholic",
 ];
 
+export const DENTAL_HISTORY_OPTIONS = [
+  "Previous extraction",
+  "Root canal",
+  "Crown or bridge",
+  "Dental implant",
+  "Denture",
+  "Orthodontic treatment",
+  "Gum treatment",
+  "Teeth sensitivity",
+  "Bleeding gums",
+  "Grinding or clenching",
+  "Jaw pain",
+  "Dental trauma",
+];
+
 export const FLOW_STATES = ["schedule", "waiting", "engage", "done"] as const;
 export type FlowState = (typeof FLOW_STATES)[number];
 

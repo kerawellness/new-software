@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { type SelectedCondition } from "@/components/patients/medical-history-picker";
-import { MedicalRecordsForm, type AllergyRow, type MedicationRow, type HabitRow } from "@/components/patients/medical-records-form";
+import { MedicalRecordsForm, DentalHistorySection, type AllergyRow, type MedicationRow, type HabitRow, type DentalHistoryRow } from "@/components/patients/medical-records-form";
 import { AppShell, PageHeader } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -95,7 +95,7 @@ function NewPatientPage() {
   const [allergies, setAllergies] = useState<AllergyRow[]>([]);
   const [medications, setMedications] = useState<MedicationRow[]>([]);
   const [habits, setHabits] = useState<HabitRow[]>([]);
-  const [caseNote, setCaseNote] = useState("");
+  const [dentalHistory, setDentalHistory] = useState<DentalHistoryRow[]>([]);
   const [noKnownAllergies, setNoKnownAllergies] = useState(false);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [saveWithFamilyPhone, setSaveWithFamilyPhone] = useState(false);
@@ -178,7 +178,7 @@ function NewPatientPage() {
             habit: h.habit,
             notes: h.notes || null,
           })),
-        _case_note: caseNote.trim() || null,
+        _case_note: null,
       });
       if (error) {
         if (error.message.includes("already on file")) {
@@ -194,6 +194,23 @@ function NewPatientPage() {
           full_name: z.string().min(1),
         })
         .parse(data);
+
+      const dentalRows = dentalHistory.filter((row) => row.item.trim());
+      if (dentalRows.length > 0) {
+        const { error: dentalError } = await supabase.from("patient_dental_history").insert(
+          dentalRows.map((row) => ({
+            clinic_id: profile.clinic_id,
+            patient_id: patient.id,
+            item: row.item.trim(),
+            notes: row.notes.trim() || null,
+          })),
+        );
+        if (dentalError) {
+          throw new Error(
+            "Patient was saved, but dental history was not. Run supabase/sql-editor/07-dental-history.sql in Supabase, then add it from the patient profile.",
+          );
+        }
+      }
 
       void logAudit(profile.clinic_id, "patient_created", "patient", patient.id, {
         patient_code: patient.patient_code,
@@ -239,7 +256,7 @@ function NewPatientPage() {
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="basic">Basic</TabsTrigger>
           <TabsTrigger value="medical">Medical</TabsTrigger>
-          <TabsTrigger value="history">Case</TabsTrigger>
+          <TabsTrigger value="history">Dental</TabsTrigger>
         </TabsList>
 
         <TabsContent value="basic" className="mt-4 space-y-4">
@@ -380,19 +397,17 @@ function NewPatientPage() {
             onChangeMedications={setMedications}
             habits={habits}
             onChangeHabits={setHabits}
+            dentalHistory={dentalHistory}
+            onChangeDentalHistory={setDentalHistory}
+            showDentalHistory={false}
           />
         </TabsContent>
 
         <TabsContent value="history" className="mt-4">
-          <section className="surface-card p-4">
-            <Label htmlFor="case">Case history / first notes</Label>
-            <Textarea
-              id="case"
-              className="mt-2 min-h-32"
-              value={caseNote}
-              onChange={(e) => setCaseNote(e.target.value)}
-            />
-          </section>
+          <DentalHistorySection
+            dentalHistory={dentalHistory}
+            onChangeDentalHistory={setDentalHistory}
+          />
         </TabsContent>
       </Tabs>
 

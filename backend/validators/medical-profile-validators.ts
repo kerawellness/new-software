@@ -26,12 +26,18 @@ const habitRowSchema = z.object({
   notes: z.string().trim().optional().default(""),
 });
 
+const dentalHistoryRowSchema = z.object({
+  item: z.string().trim().min(1),
+  notes: z.string().trim().optional().default(""),
+});
+
 export const replacePatientMedicalProfileSchema = z.object({
   patientId: z.string().uuid(),
   conditions: z.array(conditionRowSchema),
   allergies: z.array(allergyRowSchema),
   medications: z.array(medicationRowSchema),
   habits: z.array(habitRowSchema),
+  dentalHistory: z.array(dentalHistoryRowSchema).default([]),
 });
 
 export type ReplacePatientMedicalProfileInput = z.infer<typeof replacePatientMedicalProfileSchema>;
