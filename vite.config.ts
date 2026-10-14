@@ -5,17 +5,41 @@ import { nitro } from "nitro/vite";
 import { defineConfig, loadEnv } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
-const PUBLIC_SUPABASE_URL = "https://dohijfmjxrgmjtacfvxi.supabase.co";
-const PUBLIC_SUPABASE_PUBLISHABLE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRvaGlqZm1qeHJnbWp0YWNmdnhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA3Njk5OTUsImV4cCI6MjEwNjM0NTk5NX0.avTRIsmrb7w9SDsiSP3vGXRaB68Hy7uVx1vF9TWtnhU";
+function requiredSupabaseSetting(
+  name: string,
+  ...values: Array<string | undefined>
+): string {
+  const value = values.map((item) => item?.trim() ?? "").find((item) => item.length > 0);
+  if (!value) {
+    throw new Error(
+      `Missing ${name}. Set it in .env for local builds, or in the host environment (Vercel → Settings → Environment Variables) before deploying.`,
+    );
+  }
+  return value;
+}
 
 export default defineConfig(({ mode }) => {
   const fileEnv = loadEnv(mode, process.cwd(), "");
-  const supabaseUrl = fileEnv["VITE_SUPABASE_URL"] || fileEnv["SUPABASE_URL"] || PUBLIC_SUPABASE_URL;
+  const supabaseUrl =
+    mode === "test"
+      ? ""
+      : requiredSupabaseSetting(
+          "SUPABASE_URL",
+          process.env.VITE_SUPABASE_URL,
+          process.env.SUPABASE_URL,
+          fileEnv["VITE_SUPABASE_URL"],
+          fileEnv["SUPABASE_URL"],
+        );
   const supabaseKey =
-    fileEnv["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
-    fileEnv["SUPABASE_PUBLISHABLE_KEY"] ||
-    PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    mode === "test"
+      ? ""
+      : requiredSupabaseSetting(
+          "SUPABASE_PUBLISHABLE_KEY",
+          process.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          process.env.SUPABASE_PUBLISHABLE_KEY,
+          fileEnv["VITE_SUPABASE_PUBLISHABLE_KEY"],
+          fileEnv["SUPABASE_PUBLISHABLE_KEY"],
+        );
 
   return {
     define: {

@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { applyDateColumnFilter, createDateScope } from "@/lib/date-scope";
 import { todayISO } from "@/lib/format";
 import { isSlowConnection } from "@/lib/network";
-import { listFollowUps } from "@/services/followups";
+import { fetchFollowUpsList } from "@/lib/followups-list-query";
 
 /**
  * Loads the lists each page shows on first open, so a menu tap finds data
@@ -101,11 +101,12 @@ export function warmClinicLists(qc: QueryClient, clinicId: string): () => void {
       qc.prefetchQuery({
         queryKey: ["followups", "late", allDates, "asc"],
         queryFn: () =>
-          listFollowUps({
+          fetchFollowUpsList({
+            clinicId,
             viewFilter: "late",
             dateScope: allDates,
             sortOrder: "asc",
-            search: "",
+            today,
           }),
       }),
   ];
@@ -118,13 +119,16 @@ export function warmClinicLists(qc: QueryClient, clinicId: string): () => void {
 
   const step = () => {
     if (cancelled || index >= queue.length) return;
-    const run = queue[index];
-    index += 1;
-    if (run) void run().catch(() => undefined);
-    timer = window.setTimeout(step, slow ? 1200 : 500);
+    const batchSize = slow ? 1 : 3;
+    for (let n = 0; n < batchSize && index < queue.length; n += 1) {
+      const run = queue[index];
+      index += 1;
+      if (run) void run().catch(() => undefined);
+    }
+    if (index < queue.length) timer = window.setTimeout(step, slow ? 800 : 150);
   };
 
-  timer = window.setTimeout(step, 4000);
+  timer = window.setTimeout(step, slow ? 1200 : 300);
 
   return () => {
     cancelled = true;
