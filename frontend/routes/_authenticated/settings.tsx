@@ -248,6 +248,9 @@ function SettingsPage() {
     },
   });
 
+  const catalogueRows = Array.isArray(catalogueQuery.data) ? catalogueQuery.data : [];
+  const quickEntryRows = catalogueRows.filter((t) => t.quick_entry && t.active);
+
   // Save Clinic Settings mutation
   const saveClinic = useMutation({
     mutationFn: async () => {
@@ -308,7 +311,7 @@ function SettingsPage() {
       if (!profile?.clinic_id) throw new Error("Clinic profile not ready.");
 
       const nameKey = tName.trim().toLowerCase();
-      const duplicate = (catalogueQuery.data ?? []).find(
+      const duplicate = catalogueRows.find(
         (t) => t.name.trim().toLowerCase() === nameKey,
       );
       if (duplicate) {
@@ -819,6 +822,8 @@ function SettingsPage() {
 
           {catalogueQuery.isLoading ? (
             <LoadingCards count={3} />
+          ) : catalogueQuery.isError ? (
+            <ErrorState title="Unable to load treatment catalogue." onRetry={() => catalogueQuery.refetch()} />
           ) : (
             <div className="space-y-4">
               
@@ -829,13 +834,13 @@ function SettingsPage() {
                   <h4>Quick Entry List</h4>
                 </div>
                 
-                {catalogueQuery.data?.filter((t) => t.quick_entry && t.active).length === 0 ? (
+                {quickEntryRows.length === 0 ? (
                   <p className="px-0.5 py-2 text-xs italic text-muted-foreground">
                     No procedures enabled for Quick Entry yet. Turn on both Quick Entry and Active.
                   </p>
                 ) : (
                   <div className="grid gap-2 sm:grid-cols-2">
-                    {catalogueQuery.data?.filter((t) => t.quick_entry && t.active).map((item) => (
+                    {quickEntryRows.map((item) => (
                       <div key={item.id} className="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-line bg-surface-1 p-3 text-xs">
                         <span className="min-w-0 truncate font-medium text-ink-900">{item.name}</span>
                         <div className="flex shrink-0 items-center gap-1.5">
@@ -865,7 +870,7 @@ function SettingsPage() {
                   <h4>All Dental Procedures</h4>
                 </div>
 
-                {(catalogueQuery.data ?? []).length === 0 ? (
+                {catalogueRows.length === 0 ? (
                   <EmptyState
                     icon={Stethoscope}
                     title="No treatments in catalogue"
@@ -878,7 +883,7 @@ function SettingsPage() {
                   />
                 ) : (
                   <div className="space-y-2.5">
-                    {(catalogueQuery.data ?? []).map((item) => (
+                    {catalogueRows.map((item) => (
                       <div
                         key={item.id}
                         className="min-w-0 space-y-3 rounded-xl border border-line bg-surface-2/40 p-3.5 sm:flex sm:items-center sm:justify-between sm:gap-4 sm:space-y-0"

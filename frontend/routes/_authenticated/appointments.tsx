@@ -127,6 +127,12 @@ function isFromOnlineBooking(notes?: string | null) {
   return isOnlineAppointment({ notes });
 }
 
+/** Query persist stores JSON; a Set becomes `{}` and `.has` crashes the page. */
+function onlineConvertedIdSet(value: unknown): Set<string> {
+  const ids = value instanceof Set ? [...value] : Array.isArray(value) ? value : [];
+  return new Set(ids.filter((id): id is string => typeof id === "string" && id.length > 0));
+}
+
 function clinicWhatsAppName(name?: string | null | undefined) {
   const trimmed = name?.trim();
   return trimmed || "our clinic";
@@ -493,18 +499,19 @@ function AppointmentsPage() {
         .eq("action", "online_booking_converted")
         .eq("entity_type", "appointment");
       if (error) throw error;
-      return new Set(
-        (data ?? [])
-          .map((row) => row.entity_id)
-          .filter((id): id is string => typeof id === "string" && id.length > 0),
-      );
+      return (data ?? [])
+        .map((row) => row.entity_id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0);
     },
   });
+  const onlineConvertedIds = useMemo(
+    () => onlineConvertedIdSet(onlineConvertedIdsQuery.data),
+    [onlineConvertedIdsQuery.data],
+  );
 
   function appointmentIsOnline(appt: AppointmentRow) {
     if (isFromOnlineBooking(appt.notes)) return true;
-    if (onlineConvertedIdsQuery.data?.has(appt.id)) return true;
-    return false;
+    return onlineConvertedIds.has(appt.id);
   }
 
   // Reject Online Request mutation
@@ -717,7 +724,7 @@ function AppointmentsPage() {
     dateRange?.start,
     dateRange?.end,
     statusFilter,
-    onlineConvertedIdsQuery.data,
+    onlineConvertedIds,
     search,
   ]);
   const totalPatients = filteredRows.length;
@@ -1105,7 +1112,7 @@ function AppointmentsPage() {
                     onClick={() => {
                       if (
                         needsArriveIdentity(appt, {
-                          fromOnlineConvert: onlineConvertedIdsQuery.data?.has(appt.id),
+                          fromOnlineConvert: onlineConvertedIds.has(appt.id),
                         })
                       )
                         setArriveTarget(appt);

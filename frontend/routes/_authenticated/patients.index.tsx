@@ -51,7 +51,7 @@ function useDebounced<T>(value: T, delay = 300) {
 }
 
 function lastVisitDate(visits: { visit_date: string }[] | undefined) {
-  if (!visits || visits.length === 0) return null;
+  if (!Array.isArray(visits) || visits.length === 0) return null;
   return visits.reduce((latest, v) => (v.visit_date > latest ? v.visit_date : latest), "");
 }
 

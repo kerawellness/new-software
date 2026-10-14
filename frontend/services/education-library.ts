@@ -123,17 +123,36 @@ function collectSignedUrlTargets(materials: EducationMaterial[]): SignedUrlTarge
   return targets;
 }
 
+/** JSON persist cannot store Map; revive a Record, Map, or leftover `{}`. */
+export function educationSignedUrlLookup(value: unknown): Map<string, string> {
+  if (value instanceof Map) {
+    return new Map(
+      [...value.entries()].filter(
+        (entry): entry is [string, string] =>
+          typeof entry[0] === "string" && typeof entry[1] === "string",
+      ),
+    );
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return new Map(
+      Object.entries(value as Record<string, unknown>).filter(
+        (entry): entry is [string, string] => typeof entry[1] === "string",
+      ),
+    );
+  }
+  return new Map();
+}
+
 export async function createEducationSignedUrls(
   materials: EducationMaterial[],
   expiresInSeconds = 600,
-) {
+): Promise<Record<string, string>> {
   const targets = collectSignedUrlTargets(materials);
-  const urls = unwrapApi(
+  return unwrapApi(
     await createEducationSignedUrlsFn({
       data: { targets, expiresInSeconds },
     }),
   );
-  return new Map(Object.entries(urls));
 }
 
 async function registerAndUploadFile(args: {

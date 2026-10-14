@@ -4,6 +4,7 @@ import {
   classifyEducationFile,
   classifyEducationPairImages,
   educationMetadataSchema,
+  educationSignedUrlLookup,
 } from "@/services/education-library";
 
 describe("education library boundaries", () => {
@@ -83,5 +84,12 @@ describe("education library boundaries", () => {
         { name: "after.mp4", size: 1024, type: "video/mp4" },
       ),
     ).toThrow("Before/After pairs must be JPEG, PNG, or WebP images.");
+  });
+
+  it("rebuilds signed URL lookups after JSON persist drops Map", () => {
+    expect(educationSignedUrlLookup(new Map([["a", "https://a"]])).get("a")).toBe("https://a");
+    expect(educationSignedUrlLookup({ a: "https://a" }).get("a")).toBe("https://a");
+    expect(educationSignedUrlLookup({}).get("a")).toBeUndefined();
+    expect(educationSignedUrlLookup(undefined).size).toBe(0);
   });
 });

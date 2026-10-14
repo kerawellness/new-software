@@ -56,11 +56,16 @@ import {
   type EducationMaterial,
   type EducationMediaType,
   type EducationPresentation,
+  educationSignedUrlLookup,
   searchEducationMaterials,
   updateEducationMaterial,
   uploadEducationBeforeAfterPair,
   uploadEducationMaterial,
 } from "@/services/education-library";
+
+function materialTags(tags: unknown): string[] {
+  return Array.isArray(tags) ? tags.filter((tag): tag is string => typeof tag === "string") : [];
+}
 
 export const Route = createFileRoute("/_authenticated/patient-education")({
   head: () => ({
@@ -157,7 +162,7 @@ function PatientEducationPage() {
     const term = debouncedSearch.trim().toLowerCase();
     if (!term) return rows;
     return rows.filter((item) => {
-      const haystack = [item.title, item.summary ?? "", item.originalFilename, ...item.tags]
+      const haystack = [item.title, item.summary ?? "", item.originalFilename, ...materialTags(item.tags)]
         .join(" ")
         .toLowerCase();
       return haystack.includes(term);
@@ -180,7 +185,7 @@ function PatientEducationPage() {
   });
 
   const signedUrls = useMemo(
-    () => signedUrlsQuery.data ?? new Map<string, string>(),
+    () => educationSignedUrlLookup(signedUrlsQuery.data),
     [signedUrlsQuery.data],
   );
 
@@ -217,8 +222,8 @@ function PatientEducationPage() {
     setTitle(material.title);
     setSummary(material.summary ?? "");
     setFormCategory(material.category);
-    setTags(material.tags.join(", "));
-    setShowAdvancedTags(material.tags.length > 0);
+    setTags(materialTags(material.tags).join(", "));
+    setShowAdvancedTags(materialTags(material.tags).length > 0);
     setUploadMode(material.presentation === "before_after" ? "before_after" : "single");
     setFile(null);
     setBeforeFile(null);
@@ -758,9 +763,9 @@ function PatientEducationPage() {
                     )}
                   </div>
                 )}
-                {preview.tags.length > 0 ? (
+                {materialTags(preview.tags).length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
-                    {preview.tags.map((tag) => (
+                    {materialTags(preview.tags).map((tag) => (
                       <Badge key={tag} variant="outline" className="text-[10px]">
                         {tag}
                       </Badge>
