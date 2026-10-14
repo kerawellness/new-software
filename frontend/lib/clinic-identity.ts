@@ -87,14 +87,14 @@ export function mergeClinicForBill(
   const fromProfile = live ?? {};
 
   return {
-    name: fromInvoice.name ?? fromProfile.name ?? undefined,
-    address: fromProfile.address?.trim() ? fromProfile.address : fromInvoice.address,
-    phone: fromProfile.phone?.trim() ? fromProfile.phone : fromInvoice.phone,
-    email: fromProfile.email?.trim() ? fromProfile.email : fromInvoice.email,
-    logo_url: fromProfile.logo_url?.trim() ? fromProfile.logo_url : fromInvoice.logo_url,
-    tax_enabled: fromProfile.tax_enabled ?? fromInvoice.tax_enabled,
-    tax_label: fromProfile.tax_label ?? fromInvoice.tax_label,
-    tax_rate: fromProfile.tax_rate ?? fromInvoice.tax_rate,
+    name: fromInvoice.name ?? fromProfile.name ?? null,
+    address: fromProfile.address?.trim() ? fromProfile.address : (fromInvoice.address ?? null),
+    phone: fromProfile.phone?.trim() ? fromProfile.phone : (fromInvoice.phone ?? null),
+    email: fromProfile.email?.trim() ? fromProfile.email : (fromInvoice.email ?? null),
+    logo_url: fromProfile.logo_url?.trim() ? fromProfile.logo_url : (fromInvoice.logo_url ?? null),
+    tax_enabled: fromProfile.tax_enabled ?? fromInvoice.tax_enabled ?? null,
+    tax_label: fromProfile.tax_label ?? fromInvoice.tax_label ?? null,
+    tax_rate: fromProfile.tax_rate ?? fromInvoice.tax_rate ?? null,
   };
 }
 

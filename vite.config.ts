@@ -11,10 +11,10 @@ const PUBLIC_SUPABASE_PUBLISHABLE_KEY =
 
 export default defineConfig(({ mode }) => {
   const fileEnv = loadEnv(mode, process.cwd(), "");
-  const supabaseUrl = fileEnv.VITE_SUPABASE_URL || fileEnv.SUPABASE_URL || PUBLIC_SUPABASE_URL;
+  const supabaseUrl = fileEnv["VITE_SUPABASE_URL"] || fileEnv["SUPABASE_URL"] || PUBLIC_SUPABASE_URL;
   const supabaseKey =
-    fileEnv.VITE_SUPABASE_PUBLISHABLE_KEY ||
-    fileEnv.SUPABASE_PUBLISHABLE_KEY ||
+    fileEnv["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
+    fileEnv["SUPABASE_PUBLISHABLE_KEY"] ||
     PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   return {
@@ -34,7 +34,7 @@ export default defineConfig(({ mode }) => {
             tailwindcss(),
             tanstackStart({ srcDirectory: "frontend" }),
             viteReact(),
-            nitro(process.env.VERCEL ? { preset: "vercel" } : {}),
+            nitro(process.env["VERCEL"] ? { preset: "vercel" } : {}),
           ],
   };
 });

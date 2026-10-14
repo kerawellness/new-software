@@ -6,7 +6,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { parseClinicBillExtras } from "@/lib/clinic-identity";
 
 export type InvoiceBillClinic = {
-  name: string;
+  name?: string | null;
   address?: string | null;
   phone?: string | null;
   email?: string | null;

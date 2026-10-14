@@ -60,6 +60,12 @@ import { usePatientSearch } from "@/hooks/use-patients-query";
 import { useActiveStaff } from "@/hooks/use-staff-query";
 import { clinicDoctorNames } from "@/lib/clinic-identity";
 import { friendlyError, logAudit } from "@/lib/audit";
+import {
+  doctorFromNotes,
+  findSameTimeConflict,
+  sameTimeWarning,
+  type SlotAppointment,
+} from "@/lib/appointment-conflict";
 import { FLOW_LABELS, FLOW_NEXT, type FlowState } from "@/lib/constants";
 import {
   applyDateColumnFilter,
@@ -156,6 +162,47 @@ function openOnlineWhatsApp(phone: string, message: string) {
     return;
   }
   window.open(whatsappLink(phone, message), "_blank", "noopener,noreferrer");
+}
+
+async function allowSameTimeBooking(input: {
+  clinicId: string;
+  id?: string;
+  date: string;
+  time: string | null;
+  dentistId?: string | null;
+  doctorLabel?: string | null;
+}): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("appointments")
+    .select(
+      "id, appointment_date, start_time, appointment_status, notes, dentist_id, patients(full_name), pending_patients(full_name), profiles(name)",
+    )
+    .eq("clinic_id", input.clinicId)
+    .eq("appointment_date", input.date)
+    .limit(200);
+  if (error) {
+    return window.confirm("Could not check the schedule for this time. Book anyway?");
+  }
+  const rows: SlotAppointment[] = (data ?? []).map((row) => {
+    const patient = row.patients as { full_name?: string } | null;
+    const pending = row.pending_patients as { full_name?: string } | null;
+    const dentist = row.profiles as { name?: string } | null;
+    return {
+      id: row.id,
+      appointment_date: row.appointment_date,
+      start_time: row.start_time,
+      appointment_status: row.appointment_status,
+      notes: row.notes,
+      dentist_id: row.dentist_id,
+      doctorName: dentist?.name ?? null,
+      patientName: patient?.full_name ?? pending?.full_name ?? null,
+    };
+  });
+  const hit = findSameTimeConflict(rows, input);
+  if (!hit) return true;
+  const label = doctorFromNotes(hit.notes) || hit.doctorName || "";
+  const warning = sameTimeWarning(hit.patientName, (input.time ?? "").slice(0, 5));
+  return window.confirm(label ? `${warning}\nDoctor: ${label}` : warning);
 }
 
 function AppointmentsPage() {
@@ -1289,7 +1336,18 @@ function AppointmentsPage() {
                 toast.error("Select a patient first.");
                 return;
               }
-              createAppointment.mutate();
+              if (!profile?.clinic_id || !appointmentDate) {
+                createAppointment.mutate();
+                return;
+              }
+              void allowSameTimeBooking({
+                clinicId: profile.clinic_id,
+                date: appointmentDate,
+                time: startTime || null,
+                doctorLabel: attendingDoctor,
+              }).then((ok) => {
+                if (ok) createAppointment.mutate();
+              });
             }}
           >
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
@@ -1499,7 +1557,24 @@ function AppointmentsPage() {
               <Button
                 className="w-full flex-1 sm:w-auto sm:flex-none"
                 disabled={rescheduleAppointment.isPending || !rescheduleDate}
-                onClick={() => rescheduleAppointment.mutate()}
+                onClick={() => {
+                  if (!profile?.clinic_id || !rescheduleAppt || !rescheduleDate) {
+                    rescheduleAppointment.mutate();
+                    return;
+                  }
+                  const doctor =
+                    doctorFromNotes(rescheduleAppt.notes) || rescheduleAppt.profiles?.name || "";
+                  void allowSameTimeBooking({
+                    clinicId: profile.clinic_id,
+                    id: rescheduleAppt.id,
+                    date: rescheduleDate,
+                    time: rescheduleTime || null,
+                    dentistId: rescheduleAppt.dentist_id,
+                    doctorLabel: doctor,
+                  }).then((ok) => {
+                    if (ok) rescheduleAppointment.mutate();
+                  });
+                }}
               >
                 {rescheduleAppointment.isPending ? (
                   <Loader2 className="mr-1.5 size-4 animate-spin" />
@@ -1597,7 +1672,22 @@ function AppointmentsPage() {
               Cancel
             </Button>
             <Button
-              onClick={() => confirmAndScheduleMutation.mutate()}
+              onClick={() => {
+                if (!profile?.clinic_id || !confirmDate) {
+                  confirmAndScheduleMutation.mutate();
+                  return;
+                }
+                const dentist = (staffQuery.data ?? []).find((person) => person.id === confirmDentistId);
+                void allowSameTimeBooking({
+                  clinicId: profile.clinic_id,
+                  date: confirmDate,
+                  time: confirmTime || "09:00",
+                  dentistId: confirmDentistId || null,
+                  doctorLabel: dentist?.name ?? "",
+                }).then((ok) => {
+                  if (ok) confirmAndScheduleMutation.mutate();
+                });
+              }}
               disabled={confirmAndScheduleMutation.isPending}
             >
               {confirmAndScheduleMutation.isPending ? (

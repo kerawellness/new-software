@@ -78,12 +78,12 @@ describe("clinic bill extras on address", () => {
     ).toEqual({
       name: "Old Name",
       address: "New Street\nGSTIN: 29ABCDE1234F1Z5",
-      phone: undefined,
-      email: undefined,
-      logo_url: undefined,
-      tax_enabled: undefined,
-      tax_label: undefined,
-      tax_rate: undefined,
+      phone: null,
+      email: null,
+      logo_url: null,
+      tax_enabled: null,
+      tax_label: null,
+      tax_rate: null,
     });
   });
 });
