@@ -39,3 +39,6 @@ supabase/config.toml
 *.sw?
 .vercel
 .env.local
+test-results/
+playwright-report/
+blob-report/
