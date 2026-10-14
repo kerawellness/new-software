@@ -6,6 +6,7 @@ const RETIRED_STORAGE_KEYS = ["clinic-compass-query-cache-v1"];
 /** Patient names, phones, visits, and money stay in memory only. */
 const PRIVATE_QUERY_ROOTS = [
   "all-patients",
+  "all-patients-billing",
   "analytics",
   "appointments",
   "arrive-phone",

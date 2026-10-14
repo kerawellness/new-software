@@ -42,6 +42,14 @@ export default defineConfig(({ mode }) => {
         );
 
   return {
+    test: {
+      exclude: [
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/e2e/**",
+        "**/.{idea,git,cache,output,temp}/**",
+      ],
+    },
     define: {
       __VSP_SUPABASE_URL__: JSON.stringify(supabaseUrl),
       __VSP_SUPABASE_PUBLISHABLE_KEY__: JSON.stringify(supabaseKey),

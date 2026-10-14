@@ -383,6 +383,11 @@ function WhatsAppPage() {
         <TabsContent value="templates" className="space-y-3">
           {templatesQuery.isLoading ? (
             <LoadingCards count={3} />
+          ) : templatesQuery.isError ? (
+            <ErrorState
+              title="Unable to load WhatsApp templates."
+              onRetry={() => void templatesQuery.refetch()}
+            />
           ) : templates.length === 0 ? (
             <EmptyState
               icon={MessageCircle}

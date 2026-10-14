@@ -233,6 +233,7 @@ type TreatmentSession = PatientTreatmentRow & {
 };
 
 type TreatmentTimelineGroup = {
+  id: string;
   name: string;
   type: "Ongoing" | "Completed";
   sessions: TreatmentSession[];
@@ -268,6 +269,7 @@ function groupTreatmentsForTimeline(treatments: PatientTreatmentRow[]): Treatmen
     });
 
     groups.push({
+      id: sorted[0]!.id,
       name: sorted[0]!.name,
       type,
       sessions: [...labeled].reverse(),
@@ -1191,7 +1193,7 @@ function PatientDetailPage() {
               {treatmentTimeline.length ? (
                 <div className="space-y-8">
                   {(showAllTreatments ? treatmentTimeline : treatmentTimeline.slice(0, 3)).map((group) => (
-                    <div key={group.name} className="space-y-3">
+                    <div key={group.id} className="space-y-3">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <h3 className="text-base font-semibold text-primary">{group.name}</h3>
                         <Button

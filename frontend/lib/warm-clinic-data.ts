@@ -61,7 +61,8 @@ export function warmClinicLists(qc: QueryClient, clinicId: string): () => void {
             .eq("appointment_date", today)
             .neq("appointment_status", "cancelled")
             .neq("appointment_status", "no_show")
-            .order("start_time", { ascending: true, nullsFirst: false });
+            .order("start_time", { ascending: true, nullsFirst: false })
+            .limit(200);
           if (error) throw error;
           return data ?? [];
         },
@@ -92,7 +93,9 @@ export function warmClinicLists(qc: QueryClient, clinicId: string): () => void {
             .from("invoices")
             .select("id, balance_amount, grand_total, patients(id, full_name, patient_code, phone)")
             .eq("clinic_id", clinicId)
-            .gt("balance_amount", 0);
+            .gt("balance_amount", 0)
+            .order("balance_amount", { ascending: false })
+            .limit(500);
           if (error) throw error;
           return data ?? [];
         },

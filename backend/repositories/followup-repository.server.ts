@@ -2,7 +2,7 @@ import { throwDb } from "@backend/db";
 import type { FollowUpRow } from "@backend/models/followup";
 import type { ClinicDb } from "@backend/types";
 import { applyDateColumnFilter, type DateScope } from "@/lib/date-scope";
-import { withPreviousDue } from "@/lib/followup-previous-date";
+import { splitPreviousDue, withPreviousDue } from "@/lib/followup-previous-date";
 
 const LIST_FOLLOW_UPS_LIMIT = 500;
 
@@ -39,7 +39,20 @@ export async function listFollowUps(
 
   const { data, error } = await query;
   throwDb(error);
-  return (data ?? []) as unknown as FollowUpRow[];
+  const rows = (data ?? []) as unknown as FollowUpRow[];
+  const term = input.search.trim().toLowerCase();
+  if (!term) return rows;
+  return rows.filter((row) => followUpMatchesSearch(row, term));
+}
+
+function followUpMatchesSearch(row: FollowUpRow, term: string) {
+  return (
+    row.reason.toLowerCase().includes(term) ||
+    splitPreviousDue(row.notes).notes.toLowerCase().includes(term) ||
+    (row.patients?.full_name?.toLowerCase().includes(term) ?? false) ||
+    (row.patients?.patient_code?.toLowerCase().includes(term) ?? false) ||
+    (row.patients?.phone?.toLowerCase().includes(term) ?? false)
+  );
 }
 
 export async function insertFollowUp(

@@ -395,7 +395,9 @@ function BillingPage() {
         .from("invoices")
         .select("id, balance_amount, grand_total, patients(id, full_name, patient_code, phone)")
         .eq("clinic_id", profile!.clinic_id)
-        .gt("balance_amount", 0);
+        .gt("balance_amount", 0)
+        .order("balance_amount", { ascending: false })
+        .limit(500);
       if (error) throw error;
       return data ?? [];
     },

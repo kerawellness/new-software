@@ -114,7 +114,8 @@ export function useTodayFlow(options?: { realtime?: boolean }) {
         .eq("appointment_date", todayISO())
         .neq("appointment_status", "cancelled")
         .neq("appointment_status", "no_show")
-        .order("start_time", { ascending: true, nullsFirst: false });
+        .order("start_time", { ascending: true, nullsFirst: false })
+        .limit(200);
       if (error) throw error;
       return (data ?? []) as unknown as FlowAppointment[];
     },

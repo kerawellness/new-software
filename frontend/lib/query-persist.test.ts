@@ -72,6 +72,10 @@ describe("query cache persistence", () => {
     saved.setQueryData(["online-converted-appointment-ids", "c1"], new Set(["a1"]));
     saved.setQueryData(["education-signed-urls", "c1"], { id: "https://example.invalid" });
     saved.setQueryData(["patients", ""], [{ full_name: "Asha", phone: "9999999999" }]);
+    saved.setQueryData(
+      ["all-patients-billing", "c1"],
+      [{ full_name: "Asha", phone: "9999999999" }],
+    );
     saved.setQueryData(["invoice", "inv-1"], { invoice_number: "INV-1", grand_total: 500 });
     saved.setQueryData(["profile"], { clinic_id: "c1", clinic: { address: "GSTIN: 29ABCDE1234F1Z5" } });
     saved.setQueryData(["treatment-catalogue", "quick", "c1"], [{ id: "t1" }]);
@@ -82,6 +86,7 @@ describe("query cache persistence", () => {
     expect(reopened.getQueryData(["online-converted-appointment-ids", "c1"])).toBeUndefined();
     expect(reopened.getQueryData(["education-signed-urls", "c1"])).toBeUndefined();
     expect(reopened.getQueryData(["patients", ""])).toBeUndefined();
+    expect(reopened.getQueryData(["all-patients-billing", "c1"])).toBeUndefined();
     expect(reopened.getQueryData(["invoice", "inv-1"])).toBeUndefined();
     expect(reopened.getQueryData(["profile"])).toBeUndefined();
     expect(reopened.getQueryData(["treatment-catalogue", "quick", "c1"])).toEqual([{ id: "t1" }]);
