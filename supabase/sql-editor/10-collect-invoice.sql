@@ -34,12 +34,22 @@ RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = public
 AS $$
+DECLARE
+  _allow text := '';
 BEGIN
-  IF NEW.amount <= 0
-     AND current_setting('vsp.allow_payment_reversal', true) IS DISTINCT FROM '1' THEN
-    RAISE EXCEPTION 'Enter a valid payment amount.';
+  IF NEW.amount > 0 THEN
+    RETURN NEW;
   END IF;
-  RETURN NEW;
+  BEGIN
+    _allow := current_setting('vsp.allow_payment_reversal', true);
+  EXCEPTION
+    WHEN OTHERS THEN
+      _allow := '';
+  END;
+  IF _allow = '1' THEN
+    RETURN NEW;
+  END IF;
+  RAISE EXCEPTION 'Enter a valid payment amount.';
 END;
 $$;
 
@@ -88,21 +98,26 @@ BEGIN
 
   SELECT grand_total INTO _grand FROM public.invoices WHERE id = _id;
   _pay := round(GREATEST(COALESCE(_payment_amount, 0), 0), 2);
+  IF _pay > COALESCE(_grand, 0) + 0.001 AND _pay <= COALESCE(_grand, 0) + 0.05 THEN
+    _pay := COALESCE(_grand, 0);
+  END IF;
   IF _pay > COALESCE(_grand, 0) + 0.001 THEN
     RAISE EXCEPTION 'Paid amount cannot exceed the invoice total.';
   END IF;
 
   IF _pay > 0 THEN
-    PERFORM public.record_invoice_payment(
-      _id,
+    INSERT INTO public.payments (
+      clinic_id, patient_id, invoice_id, amount, payment_method, payment_date, notes, recorded_by
+    )
+    VALUES (
+      public.current_clinic_id(),
       _patient_id,
+      _id,
       _pay,
-      COALESCE(NULLIF(btrim(_payment_method), ''), 'cash'),
+      COALESCE(NULLIF(btrim(_payment_method), ''), 'cash')::public.payment_method,
       COALESCE(_payment_date, public.clinic_today()),
-      NULL,
       'Recorded with the invoice.',
-      NULL,
-      false
+      auth.uid()
     );
   END IF;
 

@@ -318,8 +318,9 @@ function QuickEntryPage() {
           : cleanPhone);
 
       const failAfter = (err: unknown): Error => {
-        const reason = friendlyError(err, "Unknown error — check connection and try again.");
-        return new Error(`Unable to save: ${reason}`);
+        const raw = err instanceof Error ? err.message : "";
+        const reason = friendlyError(err, raw || "Check your connection and try again.");
+        return new Error(reason.startsWith("Unable to save:") ? reason : `Unable to save: ${reason}`);
       };
 
       try {
@@ -367,30 +368,39 @@ function QuickEntryPage() {
       if (selectedHabit === "smoking" || selectedHabit === "both") habits.push({ habit: "Smoking" });
       if (selectedHabit === "alcohol" || selectedHabit === "both") habits.push({ habit: "Alcohol" });
 
-      const { data, error } = await supabase.rpc("save_quick_entry", {
-        _full_name: fullName.trim(),
-        _phone: phoneToSave,
-        _gender: gender,
-        _conditions: conditionInserts,
-        _allergies: allergySubstance.trim()
-          ? [{ substance: allergySubstance.trim(), notes: "Added via Quick Entry" }]
-          : [],
-        _medications: currentMedication.trim()
-          ? [{ medication: currentMedication.trim(), notes: "Added via Quick Entry" }]
-          : [],
-        _habits: habits,
-        _doctor_notes: attendingDoctor.trim() || null,
-        _clinical_notes: notes.trim() || null,
-        _treatment_label: treatmentLabel || null,
-        _treatments: namedTreatments.map((line) => ({
-          name: line.name.trim(),
-          cost: money(Math.max(0, Number(line.cost) || 0)),
-        })),
-        _invoice_items: invoiceItems,
-        _payment_amount: pAmt,
-        _payment_method: paymentMethod,
-        _visit_date: todayISO(),
-      });
+      let payAttempt = pAmt;
+      let data: unknown = null;
+      let error: { message: string } | null = null;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const saved = await supabase.rpc("save_quick_entry", {
+          _full_name: fullName.trim(),
+          _phone: phoneToSave,
+          _gender: gender,
+          _conditions: conditionInserts,
+          _allergies: allergySubstance.trim()
+            ? [{ substance: allergySubstance.trim(), notes: "Added via Quick Entry" }]
+            : [],
+          _medications: currentMedication.trim()
+            ? [{ medication: currentMedication.trim(), notes: "Added via Quick Entry" }]
+            : [],
+          _habits: habits,
+          _doctor_notes: attendingDoctor.trim() || null,
+          _clinical_notes: notes.trim() || null,
+          _treatment_label: treatmentLabel || null,
+          _treatments: namedTreatments.map((line) => ({
+            name: line.name.trim(),
+            cost: money(Math.max(0, Number(line.cost) || 0)),
+          })),
+          _invoice_items: invoiceItems,
+          _payment_amount: payAttempt,
+          _payment_method: paymentMethod,
+          _visit_date: todayISO(),
+        });
+        data = saved.data;
+        error = saved.error;
+        if (!error || !/cannot exceed/i.test(error.message) || payAttempt <= 0) break;
+        payAttempt = money(payAttempt - 0.01);
+      }
       if (error) throw error;
 
       const patient = z

@@ -41,6 +41,8 @@ import {
   getDemoPatients,
   getDemoVisits,
 } from "@/lib/demo-data";
+import { sumCollections, loadPaymentsForScope } from "@/lib/collections";
+import { createDateScope } from "@/lib/date-scope";
 import { formatCurrency, formatDate, todayISO, visitKindCounts } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -77,11 +79,7 @@ function useDashboardMetrics(clinicId?: string) {
       const monthStart = `${today.slice(0, 7)}-01`;
 
       const [payments, followUps, overdueFollowUpCount, monthPatients, visits] = await Promise.all([
-        supabase
-          .from("payments")
-          .select("amount, payment_method")
-          .eq("clinic_id", clinicId!)
-          .eq("payment_date", today),
+        loadPaymentsForScope(clinicId!, createDateScope("day")),
         supabase
           .from("follow_ups")
           .select("id, reason, due_date, status, patients(id, full_name, patient_code, phone)")
@@ -107,32 +105,26 @@ function useDashboardMetrics(clinicId?: string) {
           .eq("visit_date", today),
       ]);
 
-      if (payments.error) throw payments.error;
       if (followUps.error) throw followUps.error;
       if (overdueFollowUpCount.error) throw overdueFollowUpCount.error;
       if (monthPatients.error) throw monthPatients.error;
       if (visits.error) throw visits.error;
 
+      const collected = sumCollections(payments);
       const byMethod: Record<string, number> = {
-        cash: 0,
-        upi: 0,
-        card: 0,
-        bank_transfer: 0,
-        other: 0,
+        cash: collected.cash,
+        upi: collected.upi,
+        card: collected.card,
+        bank_transfer: collected.bank,
+        other: collected.other,
       };
-      let revenue = 0;
-      for (const p of payments.data ?? []) {
-        const amount = Number(p.amount) || 0;
-        revenue += amount;
-        const method = p.payment_method in byMethod ? p.payment_method : "other";
-        byMethod[method] = (byMethod[method] ?? 0) + amount;
-      }
+      const revenue = collected.total;
       const visitCounts = visitKindCounts(visits.data ?? []);
 
       return {
         revenue,
         collectionsByMethod: byMethod,
-        paymentCount: payments.data?.length ?? 0,
+        paymentCount: collected.count,
         followUps: followUps.data ?? [],
         overdueFollowUpCount: overdueFollowUpCount.count ?? 0,
         monthPatients: monthPatients.count ?? 0,

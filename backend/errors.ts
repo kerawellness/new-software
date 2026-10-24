@@ -20,6 +20,14 @@ export function publicErrorMessage(
   if (message.includes("already reversed")) return "This payment was already reversed.";
   if (message.includes("Payment not found")) return "Payment not found.";
   if (
+    message.length <= 180 &&
+    !/select |insert into|relation |syntax error|stack|does not exist|violates |null value|invalid input syntax/i.test(
+      message,
+    )
+  ) {
+    return message;
+  }
+  if (
     /^(Please|Select|Add|Enter|Choose|Paid amount|Payment amount|Clinic profile|Patient|Invoice|Booking clinic|Appointment details|No active clinic)/.test(
       message,
     )

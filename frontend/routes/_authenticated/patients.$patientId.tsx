@@ -11,6 +11,7 @@ import {
   Plus,
   Stethoscope,
   Trash2,
+  Undo2,
   Wallet,
   X,
   Eye,
@@ -68,6 +69,7 @@ import { useProfile } from "@/hooks/use-session";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { friendlyError } from "@/lib/audit";
+import { reversePayment } from "@/services/collect-invoice";
 import {
   FLOW_LABELS,
   PATIENT_TYPES,
@@ -701,6 +703,20 @@ function PatientDetailPage() {
       setCollectAmountError(msg);
       toast.error(msg);
     },
+  });
+
+  const undoPayment = useMutation({
+    mutationFn: async (paymentId: string) => {
+      await reversePayment(paymentId);
+    },
+    onSuccess: () => {
+      toast.success("Payment reversed. The balance is updated.");
+      void qc.invalidateQueries({ queryKey: ["patient", patientId] });
+      void qc.invalidateQueries({ queryKey: ["payments-history"] });
+      void qc.invalidateQueries({ queryKey: ["invoices"] });
+      void qc.invalidateQueries({ queryKey: ["invoice"] });
+    },
+    onError: (err) => toast.error(friendlyError(err, "Unable to reverse payment.")),
   });
 
   const saveFollowUpMutation = useMutation({
@@ -1564,7 +1580,30 @@ function PatientDetailPage() {
                               </p>
                             ) : null}
                           </div>
-                          <StatusChip tone="success">Paid</StatusChip>
+                          <div className="flex items-center gap-2">
+                            {Number(p.amount) < 0 ? (
+                              <StatusChip tone="warning">Reversal</StatusChip>
+                            ) : null}
+                            <RowActions
+                              items={
+                                Number(p.amount) > 0 && !String(p.notes ?? "").includes("[reversal-of:")
+                                  ? [
+                                      {
+                                        label: "Undo",
+                                        icon: Undo2,
+                                        destructive: true,
+                                        onSelect: () => {
+                                          if (undoPayment.isPending) return;
+                                          if (window.confirm("Reverse this payment? The amount due will go back up.")) {
+                                            undoPayment.mutate(p.id);
+                                          }
+                                        },
+                                      },
+                                    ]
+                                  : []
+                              }
+                            />
+                          </div>
                         </div>
                       ))}
                     </div>

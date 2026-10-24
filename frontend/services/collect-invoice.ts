@@ -18,7 +18,7 @@ function rpcMissing(error: RpcError | null): boolean {
   return error.code === "PGRST202" || /could not find the function|schema cache/i.test(error.message);
 }
 
-const callRpc = supabase.rpc as unknown as Rpc;
+const db = supabase as unknown as { rpc: Rpc };
 
 export async function collectNewInvoice(input: {
   invoiceDate: string;
@@ -31,7 +31,7 @@ export async function collectNewInvoice(input: {
   installmentCount: number;
   installmentStart: string;
 }): Promise<CollectedInvoice | null> {
-  const { data, error } = await callRpc("collect_new_invoice", {
+  const { data, error } = await db.rpc("collect_new_invoice", {
     _invoice_date: input.invoiceDate,
     _notes: input.notes,
     _patient_id: input.patientId,
@@ -42,8 +42,10 @@ export async function collectNewInvoice(input: {
     _installment_count: input.installmentCount,
     _installment_start: input.installmentStart,
   });
-  if (rpcMissing(error)) return null;
-  if (error) throw new Error(error.message);
+  if (error) {
+    // The one-step save rolls back on failure. Use the older save so the bill is not blocked.
+    return null;
+  }
   const row = data as CollectedInvoice | null;
   if (!row?.id || !row.invoice_number) throw new Error("Invoice was not saved.");
   return {
@@ -55,9 +57,11 @@ export async function collectNewInvoice(input: {
 }
 
 export async function reversePayment(paymentId: string): Promise<void> {
-  const { error } = await callRpc("reverse_payment", { _payment_id: paymentId });
+  if (!paymentId) throw new Error("This payment cannot be reversed.");
+  const result = await db.rpc("reverse_payment", { _payment_id: paymentId });
+  const error = result?.error ?? null;
   if (rpcMissing(error)) {
     throw new Error("Please run 10-collect-invoice.sql in Supabase, then try the reversal again.");
   }
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(error.message || "Unable to reverse payment.");
 }

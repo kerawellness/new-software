@@ -9,11 +9,13 @@ import {
   MessageCircle,
   Plus,
   Printer,
+  Undo2,
   Wallet,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { RowActions } from "@/components/common/row-actions";
 import { ErrorState, LoadingCards } from "@/components/common/states";
 import {
   StatusChip,
@@ -609,7 +611,7 @@ function InvoiceDetailPage() {
 
       {/* Payment History Ledger */}
       <div className="mt-6 surface-card p-4 space-y-3 print:hidden">
-        <h3 className="text-sm font-semibold">Payment History Ledger</h3>
+        <h3 className="text-sm font-semibold">Payment History</h3>
         {payments.length ? (
           <div className="divide-y rounded-lg border text-xs">
             {payments.map((p) => (
@@ -622,25 +624,28 @@ function InvoiceDetailPage() {
                   {p.reference ? <p className="text-[11px] text-muted-foreground">Ref: {p.reference}</p> : null}
                   {p.notes ? <p className="text-[11px] text-muted-foreground italic">{p.notes}</p> : null}
                 </div>
-                {Number(p.amount) > 0 && !String(p.notes ?? "").includes("[reversal-of:") ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={undoPayment.isPending}
-                    onClick={() => {
-                      if (window.confirm("Reverse this payment? The amount due will go back up.")) {
-                        undoPayment.mutate(p.id);
-                      }
-                    }}
-                  >
-                    Undo
-                  </Button>
-                ) : (
-                  <StatusChip tone={Number(p.amount) < 0 ? "warning" : "success"}>
-                    {Number(p.amount) < 0 ? "Reversal" : "Paid"}
-                  </StatusChip>
-                )}
+                <div className="flex items-center gap-2">
+                  {Number(p.amount) < 0 ? <StatusChip tone="warning">Reversal</StatusChip> : null}
+                  <RowActions
+                    items={
+                      Number(p.amount) > 0 && !String(p.notes ?? "").includes("[reversal-of:")
+                        ? [
+                            {
+                              label: "Undo",
+                              icon: Undo2,
+                              destructive: true,
+                              onSelect: () => {
+                                if (undoPayment.isPending) return;
+                                if (window.confirm("Reverse this payment? The amount due will go back up.")) {
+                                  undoPayment.mutate(p.id);
+                                }
+                              },
+                            },
+                          ]
+                        : []
+                    }
+                  />
+                </div>
               </div>
             ))}
           </div>

@@ -1594,7 +1594,7 @@ BEGIN
     WHEN _tax_enabled THEN round((_total_amount * _tax_rate) / 100, 2)
     ELSE 0
   END;
-  _grand_total := _total_amount + _tax_amount;
+  _grand_total := round(_total_amount + _tax_amount, 0);
   IF _grand_total < 0 OR _grand_total > 9999999999.99 THEN
     RAISE EXCEPTION 'Invoice total exceeds the supported limit';
   END IF;

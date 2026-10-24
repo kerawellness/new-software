@@ -5,6 +5,13 @@ export function paise(value: number): number {
   return (sign * Math.round(Math.abs(value) * 100 + 1e-8)) / 100;
 }
 
+/** Nearest whole rupee, half away from zero. 11.55 becomes 12. 11.49 becomes 11. */
+export function rupee(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  const sign = value < 0 ? -1 : 1;
+  return sign * Math.round(Math.abs(value) + 1e-8);
+}
+
 export function lineAmount(quantity: number, unitPrice: number): number {
   return paise(quantity * unitPrice);
 }
@@ -15,7 +22,7 @@ export function invoiceTotals(
 ): { subtotal: number; tax: number; grand: number } {
   const subtotal = paise(lines.reduce((sum, line) => sum + lineAmount(line.quantity, line.unit_price), 0));
   const tax = taxRate > 0 ? paise((subtotal * taxRate) / 100) : 0;
-  return { subtotal, tax, grand: paise(subtotal + tax) };
+  return { subtotal, tax, grand: rupee(subtotal + tax) };
 }
 
 /** Equal shares in paise. The last share absorbs the remainder so the parts sum to total. */

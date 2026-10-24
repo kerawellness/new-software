@@ -164,6 +164,9 @@ BEGIN
     FROM public.invoices
     WHERE id = (_invoice->>'id')::uuid;
 
+    IF _paid > _grand + 0.001 AND _paid <= _grand + 0.05 THEN
+      _paid := _grand;
+    END IF;
     IF _paid > _grand + 0.001 THEN
       RAISE EXCEPTION 'Payment cannot exceed balance due.';
     END IF;

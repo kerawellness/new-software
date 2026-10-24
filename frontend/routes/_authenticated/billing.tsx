@@ -10,6 +10,7 @@ import {
   Plus,
   Printer,
   Trash2,
+  Undo2,
   Wallet,
   Banknote,
   Check,
@@ -26,6 +27,7 @@ import { ErrorState, LoadingCards, EmptyState } from "@/components/common/states
 import { DateScopeFilter } from "@/components/common/date-scope-filter";
 import { Kpi } from "@/components/common/kpi";
 import { PatientLine } from "@/components/common/patient-line";
+import { RowActions } from "@/components/common/row-actions";
 import { PatientPicker } from "@/components/patients/patient-picker";
 import { StatusChip } from "@/components/common/status-chip";
 import { InvoiceBillFitFrame, InvoiceBillTemplate } from "@/components/billing/invoice-bill-template";
@@ -55,6 +57,7 @@ import { useProfile } from "@/hooks/use-session";
 import { usePatientSearch } from "@/hooks/use-patients-query";
 import { useActiveStaff } from "@/hooks/use-staff-query";
 import { friendlyError, logAudit } from "@/lib/audit";
+import { loadPaymentsForScope, sumCollections } from "@/lib/collections";
 import { invoiceTotals, paise, splitMoney } from "@/lib/money";
 import { PAYMENT_METHOD_LABELS, PAYMENT_METHODS } from "@/lib/constants";
 import { mergeClinicForBill } from "@/lib/clinic-identity";
@@ -68,7 +71,6 @@ import {
 } from "@/lib/format";
 import { getDemoInvoices, getDemoInstallmentPlans, getDemoPayments } from "@/lib/demo-data";
 import {
-  applyDateColumnFilter,
   createDateScope,
   dateScopeLabel,
   resolveDateScope,
@@ -78,9 +80,9 @@ import {
   printInvoiceA4,
   shareInvoiceImage,
 } from "@/lib/share-invoice-image";
-import { collectNewInvoice } from "@/services/collect-invoice";
 import { createInvoiceWithItems } from "@/services/invoices";
 import { recordInvoicePayment } from "@/services/record-payment";
+import { reversePayment } from "@/services/collect-invoice";
 
 export const Route = createFileRoute("/_authenticated/billing")({
   validateSearch: (search: Record<string, unknown>): {
@@ -208,7 +210,7 @@ function BillingPage() {
   const [payNotes, setPayNotes] = useState("");
 
   const [activeTab, setActiveTab] = useState("outstanding");
-  const [collectionScope, setCollectionScope] = useState(() => createDateScope("month"));
+  const [collectionScope, setCollectionScope] = useState(() => createDateScope("day"));
   const [targetInstallment, setTargetInstallment] = useState<any | null>(null);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState<any | null>(null);
   const [transactionDetailsOpen, setTransactionDetailsOpen] = useState(false);
@@ -377,16 +379,7 @@ function BillingPage() {
   const collectionsQuery = useQuery({
     queryKey: ["billing-collections", profile?.clinic_id, collectionScope],
     enabled: !!profile?.clinic_id,
-    queryFn: async () => {
-      let query = supabase
-        .from("payments")
-        .select("amount, payment_method, payment_date")
-        .eq("clinic_id", profile!.clinic_id);
-      query = applyDateColumnFilter(query, "payment_date", collectionScope);
-      const { data, error } = await query.limit(2000);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: () => loadPaymentsForScope(profile!.clinic_id, collectionScope),
   });
 
   // Outstanding invoices query for rollup (default tab). Loads before plans.
@@ -474,16 +467,16 @@ function BillingPage() {
   const eachMonthAmount = installmentShares[0] ?? 0;
 
   useEffect(() => {
-    if (paymentType === "full" && newInvoiceOpen) {
-      setPayNow(grandTotal.toFixed(2));
-    }
-  }, [items, paymentType, newInvoiceOpen, taxRate, grandTotal]);
+    if (!newInvoiceOpen || paymentType !== "full") return;
+    const fixed = grandTotal > 0 ? String(grandTotal) : "0";
+    if (payNow !== fixed) setPayNow(fixed);
+  }, [grandTotal, newInvoiceOpen, paymentType, payNow]);
 
   useEffect(() => {
     if (!newInvoiceOpen || paymentType !== "installment") return;
     if (grandTotal > 0 && balanceAmount <= 0) {
       setPaymentType("full");
-      setPayNow(grandTotal.toFixed(2));
+      setPayNow(String(grandTotal));
       toast.message("Balance due is zero — only Full payment is available.");
     }
   }, [balanceAmount, grandTotal, newInvoiceOpen, paymentType]);
@@ -504,31 +497,6 @@ function BillingPage() {
       const selectedDoc = staffQuery.data?.find((d) => d.id === doctorId);
       const docPrefix = selectedDoc ? `[Doctor: ${selectedDoc.name}]` : "";
       const finalNotes = [docPrefix, invoiceNotes.trim()].filter(Boolean).join(" ");
-      const invoiceItems = items.map((i) => ({
-        description: i.description.trim(),
-        quantity: i.quantity,
-        unit_price: i.unit_price,
-      }));
-      const collected = await collectNewInvoice({
-        invoiceDate,
-        notes: finalNotes || null,
-        patientId: selectedPatient.id,
-        items: invoiceItems,
-        paymentAmount: payNowAmount > 0 ? payNowAmount : 0,
-        paymentMethod,
-        paymentDate: todayISO(),
-        installmentCount: paymentType === "installment" && balanceAmount > 0 ? numInstallmentsVal : 0,
-        installmentStart: todayISO(),
-      });
-      if (collected) {
-        void logAudit(profile.clinic_id, "invoice_created", "invoice", collected.id, {
-          invoice_number: collected.invoice_number,
-          patient: selectedPatient.full_name,
-          grand_total: collected.grand_total,
-        });
-        return collected;
-      }
-
       const inv = await createInvoiceWithItems({
         invoiceDate,
         notes: finalNotes || null,
@@ -547,9 +515,10 @@ function BillingPage() {
         .single();
       if (savedBillError) throw savedBillError;
       const due = paise(Number(savedBill.grand_total));
-      const pay = paise(payNowAmount);
+      let pay = paise(payNowAmount);
       if (pay > due + 0.001) {
-        throw new Error("Paid amount cannot exceed the invoice total.");
+        if (pay - due < 1) pay = due;
+        else throw new Error("Paid amount cannot exceed the invoice total.");
       }
       const remaining = Math.max(0, paise(due - pay));
       const shares = splitMoney(remaining, numInstallmentsVal);
@@ -737,6 +706,23 @@ function BillingPage() {
     },
   });
 
+  const undoPayment = useMutation({
+    mutationFn: async (paymentId: string) => {
+      await reversePayment(paymentId);
+    },
+    onSuccess: () => {
+      toast.success("Payment reversed. The balance is updated.");
+      setTransactionDetailsOpen(false);
+      setSelectedPaymentForDetails(null);
+      void qc.invalidateQueries({ queryKey: ["payments-history"] });
+      void qc.invalidateQueries({ queryKey: ["invoices"] });
+      void qc.invalidateQueries({ queryKey: ["invoice"] });
+      void qc.invalidateQueries({ queryKey: ["billing-collections"] });
+      void qc.invalidateQueries({ queryKey: ["patient"] });
+    },
+    onError: (err) => toast.error(friendlyError(err, "Unable to reverse payment.")),
+  });
+
   function resetInvoiceForm() {
     setSelectedPatient(null);
     setPatientSearch("");
@@ -875,16 +861,13 @@ function BillingPage() {
           return payment.payment_date >= range.start && payment.payment_date <= range.end;
         })
       : [];
-    let cash = 0;
-    let upi = 0;
-    let other = 0;
-    for (const payment of [...demo, ...(collectionsQuery.data ?? [])]) {
-      const amount = Number(payment.amount) || 0;
-      if (payment.payment_method === "cash") cash += amount;
-      else if (payment.payment_method === "upi") upi += amount;
-      else other += amount;
-    }
-    return { cash, upi, other, total: cash + upi + other };
+    const totals = sumCollections([...demo, ...(collectionsQuery.data ?? [])]);
+    return {
+      cash: totals.cash,
+      upi: totals.upi,
+      other: paise(totals.card + totals.bank + totals.other),
+      total: totals.total,
+    };
   }, [collectionsQuery.data, collectionScope, showDemoData]);
 
   const planRows = useMemo(() => {
@@ -1019,8 +1002,8 @@ function BillingPage() {
             if (search.trim()) {
               const t = search.trim().toLowerCase();
               list = list.filter((p) =>
-                p.patients?.full_name.toLowerCase().includes(t) ||
-                p.patients?.patient_code.toLowerCase().includes(t) ||
+                (p.patients?.full_name ?? "").toLowerCase().includes(t) ||
+                (p.patients?.patient_code ?? "").toLowerCase().includes(t) ||
                 (p.notes ?? "").toLowerCase().includes(t)
               );
             }
@@ -1040,23 +1023,46 @@ function BillingPage() {
                     !tags.installmentText ? tags.cleanNote : null,
                     p.invoices?.invoice_number ? `#${p.invoices.invoice_number}` : null,
                   ].filter(Boolean);
+                  const canUndo = Number(p.amount) > 0 && !String(p.notes ?? "").includes("[reversal-of:");
                   return (
-                    <button
+                    <div
                       key={p.id}
-                      type="button"
-                      className="w-full rounded-xl border border-line bg-surface-1 px-3 text-left transition-colors duration-150 hover:bg-surface-2/60"
-                      onClick={() => {
-                        setSelectedPaymentForDetails(p);
-                        setTransactionDetailsOpen(true);
-                      }}
+                      className="flex items-center gap-2 rounded-xl border border-line bg-surface-1 px-3"
                     >
-                      <PatientLine
-                        name={p.patients?.full_name ?? "Unknown patient"}
-                        meta={metaParts.join(" · ")}
-                        figure={`+${formatCurrency(p.amount, currency)}`}
-                        action={<ArrowUpRight className="size-4 text-ink-300" aria-hidden />}
+                      <button
+                        type="button"
+                        className="min-w-0 flex-1 py-1 text-left"
+                        onClick={() => {
+                          setSelectedPaymentForDetails(p);
+                          setTransactionDetailsOpen(true);
+                        }}
+                      >
+                        <PatientLine
+                          name={p.patients?.full_name ?? "Unknown patient"}
+                          meta={metaParts.join(" · ")}
+                          figure={`+${formatCurrency(p.amount, currency)}`}
+                        />
+                      </button>
+                      <RowActions
+                        items={
+                          canUndo
+                            ? [
+                                {
+                                  label: "Undo",
+                                  icon: Undo2,
+                                  destructive: true,
+                                  onSelect: () => {
+                                    if (undoPayment.isPending) return;
+                                    if (window.confirm("Reverse this payment? The amount due will go back up.")) {
+                                      undoPayment.mutate(p.id);
+                                    }
+                                  },
+                                },
+                              ]
+                            : []
+                        }
                       />
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -1613,6 +1619,14 @@ function BillingPage() {
                       <span className="font-semibold tabular-nums text-ink-900">{formatCurrency(taxAmount, currency)}</span>
                     </div>
                   ) : null}
+                  {paise(grandTotal - subtotal - taxAmount) !== 0 ? (
+                    <div className="flex justify-between">
+                      <span className="text-ink-500">Round off</span>
+                      <span className="font-semibold tabular-nums text-ink-900">
+                        {formatCurrency(paise(grandTotal - subtotal - taxAmount), currency)}
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -1624,7 +1638,7 @@ function BillingPage() {
                   type="button"
                   onClick={() => {
                     setPaymentType("full");
-                    setPayNow(grandTotal.toFixed(2));
+                    setPayNow(String(grandTotal));
                   }}
                   className={`flex-1 py-2.5 text-xs font-semibold transition-all ${paymentType === "full" ? "bg-primary text-white" : "bg-surface-1 text-ink-500 hover:bg-surface-2"}`}
                 >
@@ -1674,7 +1688,7 @@ function BillingPage() {
                         const next = e.target.value;
                         const nextNum = Number(next) || 0;
                         if (nextNum > grandTotal) {
-                          setPayNow(grandTotal.toFixed(2));
+                          setPayNow(String(grandTotal));
                           setPaymentType("full");
                           toast.message("Full amount paid Ã¯Â¿Â½ switched to Full payment.");
                           return;
@@ -1682,7 +1696,7 @@ function BillingPage() {
                         setPayNow(next);
                         if (grandTotal > 0 && nextNum >= grandTotal) {
                           setPaymentType("full");
-                          setPayNow(grandTotal.toFixed(2));
+                          setPayNow(String(grandTotal));
                           toast.message("Full amount paid Ã¯Â¿Â½ switched to Full payment.");
                         }
                       }}
@@ -1748,19 +1762,12 @@ function BillingPage() {
                   <Label>Paid</Label>
                   <Input
                     type="number"
-                    min={0}
-                    max={grandTotal}
+                    readOnly
                     value={payNow}
-                    onChange={(e) => {
-                      const next = Number(e.target.value);
-                      if (!Number.isNaN(next) && next > grandTotal) {
-                        setPayNow(grandTotal.toFixed(2));
-                        toast.message("Paid amount capped to invoice total.");
-                        return;
-                      }
-                      setPayNow(e.target.value);
-                    }}
                   />
+                  <p className="text-[11px] text-ink-500">
+                    Full payment sets Paid to the total. Use Installment to leave a balance.
+                  </p>
                 </div>
               </div>
             )}
