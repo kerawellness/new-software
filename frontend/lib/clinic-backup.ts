@@ -73,7 +73,7 @@ function stampRange(range: Range | null, kind: Dated): { start: string; end: str
   };
 }
 
-export async function downloadClinicBackup(clinicId: string, scope: BackupScope): Promise<void> {
+export async function downloadClinicBackup(clinicId: string, scope: BackupScope, password: string): Promise<void> {
   const between = scope.mode === "between" ? backupBetweenRange(scope.from, scope.to) : null;
   const range = scope.mode === "month" ? backupMonthRange(scope.month) : between;
   const label =
@@ -361,11 +361,80 @@ export async function downloadClinicBackup(clinicId: string, scope: BackupScope)
   };
 
   const zipped = zipSync(files, { level: 6 });
-  const blob = new Blob([zipped], { type: "application/zip" });
+  const locked = await lockBackup(zipped, password);
+  const blob = new Blob([locked], { type: "application/octet-stream" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `clinic-backup-${label}.zip`;
+  link.download = `clinic-backup-${label}.vspbackup`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+const BACKUP_MAGIC = "VSP1";
+
+function backupBytes(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
+async function backupKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+  const material = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(password),
+    "PBKDF2",
+    false,
+    ["deriveKey"],
+  );
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt: backupBytes(salt), iterations: 120_000, hash: "SHA-256" },
+    material,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+export async function lockBackup(zipBytes: Uint8Array, password: string): Promise<Uint8Array> {
+  if (password.trim().length < 8) throw new Error("Use a backup password of at least 8 characters.");
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await backupKey(password, salt);
+  const cipher = new Uint8Array(
+    await crypto.subtle.encrypt({ name: "AES-GCM", iv: backupBytes(iv) }, key, backupBytes(zipBytes)),
+  );
+  const magic = new TextEncoder().encode(BACKUP_MAGIC);
+  const out = new Uint8Array(magic.length + salt.length + iv.length + cipher.length);
+  out.set(magic, 0);
+  out.set(salt, magic.length);
+  out.set(iv, magic.length + salt.length);
+  out.set(cipher, magic.length + salt.length + iv.length);
+  return out;
+}
+
+export async function unlockBackup(locked: Uint8Array, password: string): Promise<Uint8Array> {
+  const magic = new TextDecoder().decode(locked.slice(0, 4));
+  if (magic !== BACKUP_MAGIC || locked.byteLength < 33) {
+    throw new Error("This is not a locked clinic backup.");
+  }
+  const salt = locked.slice(4, 20);
+  const iv = locked.slice(20, 32);
+  const cipher = locked.slice(32);
+  try {
+    const key = await backupKey(password, salt);
+    return new Uint8Array(
+      await crypto.subtle.decrypt({ name: "AES-GCM", iv: backupBytes(iv) }, key, backupBytes(cipher)),
+    );
+  } catch {
+    throw new Error("That password does not open this backup.");
+  }
+}
+
+export function downloadZip(bytes: Uint8Array, filename: string) {
+  const blob = new Blob([backupBytes(bytes)], { type: "application/zip" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
 }

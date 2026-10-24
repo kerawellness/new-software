@@ -55,7 +55,7 @@ import { friendlyError } from "@/lib/audit";
 import { createDateScope, resolveDateScope, type DateScope } from "@/lib/date-scope";
 import { getDemoFollowUps, isDemoId } from "@/lib/demo-data";
 import { splitPreviousDue } from "@/lib/followup-previous-date";
-import { formatDate, formatDayMonth, todayISO } from "@/lib/format";
+import { formatDate, formatDayMonth, todayISO, whatsappLink } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { fetchFollowUpsList } from "@/lib/followups-list-query";
 import {
@@ -530,12 +530,9 @@ function FollowUpsPage() {
                               label: "WhatsApp",
                               icon: MessageCircle,
                               onSelect: () => {
-                                const phone = item.patients!.phone.replace(/[^0-9]/g, "");
-                                const text = encodeURIComponent(
-                                  `Hello ${item.patients!.full_name}, this is a gentle reminder from ${profile?.clinic?.name ?? "Clinic"} regarding your follow-up checkup for "${item.reason}" due on ${formatDate(item.due_date)}. Please let us know if you need to adjust your visit!`,
-                                );
+                                const text = `Hello ${item.patients!.full_name}, this is a gentle reminder from ${profile?.clinic?.name ?? "Clinic"} regarding your follow-up checkup for "${item.reason}" due on ${formatDate(item.due_date)}. Please let us know if you need to adjust your visit!`;
                                 window.open(
-                                  `https://wa.me/${phone}?text=${text}`,
+                                  whatsappLink(item.patients!.phone, text),
                                   "_blank",
                                   "noopener,noreferrer",
                                 );

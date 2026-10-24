@@ -69,7 +69,7 @@ function useDashboardMetrics(clinicId?: string) {
     enabled: !!clinicId,
     staleTime: 60_000,
     networkMode: "always",
-    retry: (failureCount) => !isBrowserOffline() && failureCount < 1,
+    retry: (failureCount) => !isBrowserOffline() && failureCount < 2,
     queryFn: () =>
       withNetworkTimeout((async () => {
         failIfOffline();
@@ -150,7 +150,7 @@ function useOutstanding(clinicId?: string) {
     enabled: !!clinicId,
     staleTime: 60_000,
     networkMode: "always",
-    retry: (failureCount) => !isBrowserOffline() && failureCount < 1,
+    retry: (failureCount) => !isBrowserOffline() && failureCount < 2,
     queryFn: () =>
       withNetworkTimeout((async () => {
         failIfOffline();

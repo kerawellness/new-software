@@ -216,6 +216,8 @@ function AppointmentsPage() {
   const [search, setSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
+  const [scheduleLimit, setScheduleLimit] = useState(200);
+  const [onlineLimit, setOnlineLimit] = useState(200);
   useNewHotkey(() => setNewOpen(true));
 
   const listView =
@@ -253,7 +255,7 @@ function AppointmentsPage() {
 
   // Appointments list query
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["appointments", dateScope, statusFilter, sortOrder],
+    queryKey: ["appointments", dateScope, statusFilter, sortOrder, scheduleLimit],
     enabled: !!profile?.clinic_id,
     placeholderData: keepPreviousData,
     queryFn: async () => {
@@ -265,7 +267,7 @@ function AppointmentsPage() {
         )
         .order("appointment_date", { ascending })
         .order("start_time", { ascending, nullsFirst: false })
-        .limit(200);
+        .limit(scheduleLimit);
 
       query = applyDateColumnFilter(query, "appointment_date", dateScope);
       if (
@@ -518,7 +520,7 @@ function AppointmentsPage() {
 
   // Online booking requests (pending + rejected for filters; confirmed for blue schedule rows)
   const onlineRequestsQuery = useQuery({
-    queryKey: ["online-appointment-requests", profile?.clinic_id],
+    queryKey: ["online-appointment-requests", profile?.clinic_id, onlineLimit],
     enabled: !!profile?.clinic_id,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -527,7 +529,7 @@ function AppointmentsPage() {
         .eq("clinic_id", profile!.clinic_id)
         .in("status", ["requested", "rejected"])
         .order("created_at", { ascending: false })
-        .limit(200);
+        .limit(onlineLimit);
       if (error) throw error;
       return data ?? [];
     },
@@ -1319,6 +1321,17 @@ function AppointmentsPage() {
           })}
         </div>
       )}
+
+      {listView === "schedule" && (data?.length ?? 0) >= scheduleLimit ? (
+        <Button type="button" variant="outline" className="mt-3 w-full" onClick={() => setScheduleLimit((count) => count + 200)}>
+          Show more appointments
+        </Button>
+      ) : null}
+      {listView !== "schedule" && (onlineRequestsQuery.data?.length ?? 0) >= onlineLimit ? (
+        <Button type="button" variant="outline" className="mt-3 w-full" onClick={() => setOnlineLimit((count) => count + 200)}>
+          Show more requests
+        </Button>
+      ) : null}
 
       {/* New Appointment Modal */}
       <Dialog open={newOpen} onOpenChange={setNewOpen}>

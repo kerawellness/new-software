@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { useBrowserOffline, useProfile, useSession } from "@/hooks/use-session";
@@ -32,7 +33,9 @@ function AuthenticatedLayout() {
         void qc.invalidateQueries({ queryKey: ["analytics"] });
         void qc.invalidateQueries({ queryKey: ["patient"] });
       })
-      .catch(() => {});
+      .catch(() => {
+        toast.error("Could not mark missed appointments. Refresh the page to try again.");
+      });
     return () => {
       cancelled = true;
     };

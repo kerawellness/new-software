@@ -45,6 +45,7 @@ import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { friendlyError, logAudit } from "@/lib/audit";
 import { clinicDoctorNames } from "@/lib/clinic-identity";
 import { catalogueOptionLabel, formatCurrency, isPatientPhone, patientPhoneDigits, todayISO, whatsappLink } from "@/lib/format";
+import { paise } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { nextSharedPhone, splitFamilyPhone } from "@/lib/family-phone";
 import { familyPhonesForBase, findPatientsByPhone } from "@/services/patients";
@@ -69,7 +70,7 @@ type QuickTreatmentLine = {
 };
 
 function money(n: number) {
-  return Math.round((Number(n) || 0) * 100) / 100;
+  return paise(Number(n) || 0);
 }
 
 const QE_MSG_ALLERGIES =

@@ -67,7 +67,7 @@ export function useProfile(enabled = true) {
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
     networkMode: "always",
-    retry: (failureCount) => !isBrowserOffline() && failureCount < 1,
+    retry: (failureCount) => !isBrowserOffline() && failureCount < 2,
     queryFn: () =>
       withNetworkTimeout(
         (async (): Promise<ClinicProfile | null> => {

@@ -45,9 +45,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/use-session";
 import { friendlyError, logAudit } from "@/lib/audit";
+import { reversePayment } from "@/services/collect-invoice";
 import { PAYMENT_METHOD_LABELS, PAYMENT_METHODS } from "@/lib/constants";
 import { mergeClinicForBill } from "@/lib/clinic-identity";
 import { addMonthsLocalISO, formatCurrency, formatDate, todayISO } from "@/lib/format";
+import { paise, splitMoney } from "@/lib/money";
 import { recordInvoicePayment } from "@/services/record-payment";
 import {
   downloadInvoicePdfA4,
@@ -308,6 +310,20 @@ function InvoiceDetailPage() {
     onError: (err) => toast.error(friendlyError(err, "Unable to record payment.")),
   });
 
+  const undoPayment = useMutation({
+    mutationFn: async (paymentId: string) => {
+      await reversePayment(paymentId);
+    },
+    onSuccess: () => {
+      toast.success("Payment reversed. The balance is updated.");
+      void qc.invalidateQueries({ queryKey: ["invoice", invoiceId] });
+      void qc.invalidateQueries({ queryKey: ["invoices"] });
+      void qc.invalidateQueries({ queryKey: ["payments-history"] });
+      void qc.invalidateQueries({ queryKey: ["billing-collections"] });
+    },
+    onError: (err) => toast.error(friendlyError(err, "Unable to reverse payment.")),
+  });
+
   const createInstallmentPlan = useMutation({
     mutationFn: async () => {
       if (!data?.invoice) return;
@@ -321,10 +337,11 @@ function InvoiceDetailPage() {
       if (dp > invoiceBalance + 0.001) {
         throw new Error("Down payment cannot exceed outstanding balance.");
       }
-      const remainingBalance = invoiceBalance - dp;
+      const remainingBalance = paise(invoiceBalance - dp);
       if (remainingBalance <= 0) throw new Error("Down payment covers entire balance — use Full payment instead.");
 
-      const monthlyAmount = Math.round((remainingBalance / totalCount) * 100) / 100;
+      const shares = splitMoney(remainingBalance, totalCount);
+      const monthlyAmount = shares[0] ?? 0;
 
       // 1. Create installment plan
       const { data: planData, error: planErr } = await supabase
@@ -366,7 +383,7 @@ function InvoiceDetailPage() {
           clinic_id: profile.clinic_id,
           installment_plan_id: planData.id,
           due_date: addMonthsLocalISO(planStartDate, i),
-          amount: monthlyAmount,
+          amount: shares[i - 1] ?? monthlyAmount,
           paid_amount: 0,
           status: "pending" as const,
         });
@@ -605,9 +622,25 @@ function InvoiceDetailPage() {
                   {p.reference ? <p className="text-[11px] text-muted-foreground">Ref: {p.reference}</p> : null}
                   {p.notes ? <p className="text-[11px] text-muted-foreground italic">{p.notes}</p> : null}
                 </div>
-                <StatusChip tone="success">
-                  Paid
-                </StatusChip>
+                {Number(p.amount) > 0 && !String(p.notes ?? "").includes("[reversal-of:") ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={undoPayment.isPending}
+                    onClick={() => {
+                      if (window.confirm("Reverse this payment? The amount due will go back up.")) {
+                        undoPayment.mutate(p.id);
+                      }
+                    }}
+                  >
+                    Undo
+                  </Button>
+                ) : (
+                  <StatusChip tone={Number(p.amount) < 0 ? "warning" : "success"}>
+                    {Number(p.amount) < 0 ? "Reversal" : "Paid"}
+                  </StatusChip>
+                )}
               </div>
             ))}
           </div>

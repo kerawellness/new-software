@@ -55,6 +55,7 @@ import { useProfile } from "@/hooks/use-session";
 import { usePatientSearch } from "@/hooks/use-patients-query";
 import { useActiveStaff } from "@/hooks/use-staff-query";
 import { friendlyError, logAudit } from "@/lib/audit";
+import { invoiceTotals, paise, splitMoney } from "@/lib/money";
 import { PAYMENT_METHOD_LABELS, PAYMENT_METHODS } from "@/lib/constants";
 import { mergeClinicForBill } from "@/lib/clinic-identity";
 import {
@@ -63,6 +64,7 @@ import {
   formatCurrency,
   formatDate,
   todayISO,
+  whatsappDigits,
 } from "@/lib/format";
 import { getDemoInvoices, getDemoInstallmentPlans, getDemoPayments } from "@/lib/demo-data";
 import {
@@ -76,6 +78,7 @@ import {
   printInvoiceA4,
   shareInvoiceImage,
 } from "@/lib/share-invoice-image";
+import { collectNewInvoice } from "@/services/collect-invoice";
 import { createInvoiceWithItems } from "@/services/invoices";
 import { recordInvoicePayment } from "@/services/record-payment";
 
@@ -458,19 +461,21 @@ function BillingPage() {
   });
 
   // Calculate Subtotal and Taxes for New Invoice Form
-  const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
   const taxRate = profile?.clinic?.tax_enabled ? Number(profile?.clinic?.tax_rate ?? 0) : 0;
-  const taxAmount = (subtotal * taxRate) / 100;
-  const grandTotal = subtotal + taxAmount;
+  const priced = invoiceTotals(items, taxRate);
+  const subtotal = priced.subtotal;
+  const taxAmount = priced.tax;
+  const grandTotal = priced.grand;
 
-  const payNowAmount = Number(payNow) || 0;
-  const balanceAmount = Math.max(0, grandTotal - payNowAmount);
+  const payNowAmount = paise(Number(payNow) || 0);
+  const balanceAmount = Math.max(0, paise(grandTotal - payNowAmount));
   const numInstallmentsVal = Number.parseInt(planInstallments, 10) || 1;
-  const eachMonthAmount = balanceAmount / numInstallmentsVal;
+  const installmentShares = splitMoney(balanceAmount, numInstallmentsVal);
+  const eachMonthAmount = installmentShares[0] ?? 0;
 
   useEffect(() => {
     if (paymentType === "full" && newInvoiceOpen) {
-      setPayNow(String(grandTotal));
+      setPayNow(grandTotal.toFixed(2));
     }
   }, [items, paymentType, newInvoiceOpen, taxRate, grandTotal]);
 
@@ -478,7 +483,7 @@ function BillingPage() {
     if (!newInvoiceOpen || paymentType !== "installment") return;
     if (grandTotal > 0 && balanceAmount <= 0) {
       setPaymentType("full");
-      setPayNow(String(grandTotal));
+      setPayNow(grandTotal.toFixed(2));
       toast.message("Balance due is zero — only Full payment is available.");
     }
   }, [balanceAmount, grandTotal, newInvoiceOpen, paymentType]);
@@ -499,6 +504,30 @@ function BillingPage() {
       const selectedDoc = staffQuery.data?.find((d) => d.id === doctorId);
       const docPrefix = selectedDoc ? `[Doctor: ${selectedDoc.name}]` : "";
       const finalNotes = [docPrefix, invoiceNotes.trim()].filter(Boolean).join(" ");
+      const invoiceItems = items.map((i) => ({
+        description: i.description.trim(),
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+      }));
+      const collected = await collectNewInvoice({
+        invoiceDate,
+        notes: finalNotes || null,
+        patientId: selectedPatient.id,
+        items: invoiceItems,
+        paymentAmount: payNowAmount > 0 ? payNowAmount : 0,
+        paymentMethod,
+        paymentDate: todayISO(),
+        installmentCount: paymentType === "installment" && balanceAmount > 0 ? numInstallmentsVal : 0,
+        installmentStart: todayISO(),
+      });
+      if (collected) {
+        void logAudit(profile.clinic_id, "invoice_created", "invoice", collected.id, {
+          invoice_number: collected.invoice_number,
+          patient: selectedPatient.full_name,
+          grand_total: collected.grand_total,
+        });
+        return collected;
+      }
 
       const inv = await createInvoiceWithItems({
         invoiceDate,
@@ -511,7 +540,21 @@ function BillingPage() {
         })),
       });
 
-      if ((paymentType === "full" || balanceAmount <= 0) && payNowAmount > 0) {
+      const { data: savedBill, error: savedBillError } = await supabase
+        .from("invoices")
+        .select("grand_total")
+        .eq("id", inv.id)
+        .single();
+      if (savedBillError) throw savedBillError;
+      const due = paise(Number(savedBill.grand_total));
+      const pay = paise(payNowAmount);
+      if (pay > due + 0.001) {
+        throw new Error("Paid amount cannot exceed the invoice total.");
+      }
+      const remaining = Math.max(0, paise(due - pay));
+      const shares = splitMoney(remaining, numInstallmentsVal);
+
+      if ((paymentType === "full" || remaining <= 0) && pay > 0) {
         await recordInvoicePayment({
           clinicId: profile.clinic_id,
           recordedBy: profile.id,
@@ -519,22 +562,22 @@ function BillingPage() {
           invoiceNumber: inv.invoice_number,
           patientId: selectedPatient.id,
           patientName: selectedPatient.full_name,
-          balanceAmount: grandTotal,
-          amount: payNowAmount,
+          balanceAmount: due,
+          amount: pay,
           paymentMethod: paymentMethod,
           notes: "Full payment recorded at invoice creation.",
         });
       }
 
-      if (paymentType === "installment" && balanceAmount > 0) {
+      if (paymentType === "installment" && remaining > 0) {
         const { data: planData, error: planErr } = await supabase
           .from("installment_plans")
           .insert({
             clinic_id: profile.clinic_id,
             invoice_id: inv.id,
             number_of_installments: numInstallmentsVal,
-            down_payment: payNowAmount,
-            installment_amount: Math.round((balanceAmount / numInstallmentsVal) * 100) / 100,
+            down_payment: pay,
+            installment_amount: shares[0] ?? 0,
             start_date: todayISO(),
             status: "active",
           })
@@ -542,7 +585,7 @@ function BillingPage() {
           .single();
         if (planErr) throw planErr;
 
-        if (payNowAmount > 0) {
+        if (pay > 0) {
           await recordInvoicePayment({
             clinicId: profile.clinic_id,
             recordedBy: profile.id,
@@ -550,8 +593,8 @@ function BillingPage() {
             invoiceNumber: inv.invoice_number,
             patientId: selectedPatient.id,
             patientName: selectedPatient.full_name,
-            balanceAmount: grandTotal,
-            amount: payNowAmount,
+            balanceAmount: due,
+            amount: pay,
             paymentMethod: paymentMethod,
             notes: "Down payment for installment plan.",
           });
@@ -564,7 +607,7 @@ function BillingPage() {
             clinic_id: profile.clinic_id,
             installment_plan_id: planData.id,
             due_date: addMonthsLocalISO(start, i),
-            amount: Math.round((balanceAmount / numInstallmentsVal) * 100) / 100,
+            amount: shares[i - 1] ?? eachMonthAmount,
             paid_amount: 0,
             status: "pending" as const,
           });
@@ -577,7 +620,7 @@ function BillingPage() {
       void logAudit(profile.clinic_id, "invoice_created", "invoice", inv.id, {
         invoice_number: inv.invoice_number,
         patient: selectedPatient.full_name,
-        grand_total: grandTotal,
+        grand_total: due,
       });
 
       return inv;
@@ -746,7 +789,7 @@ function BillingPage() {
   }
 
   function normalizePhoneForWhatsApp(phone: string): string {
-    return phone.replace(/\D/g, "");
+    return whatsappDigits(phone);
   }
 
   async function handleShareInvoiceImage() {
@@ -1581,7 +1624,7 @@ function BillingPage() {
                   type="button"
                   onClick={() => {
                     setPaymentType("full");
-                    setPayNow(String(grandTotal));
+                    setPayNow(grandTotal.toFixed(2));
                   }}
                   className={`flex-1 py-2.5 text-xs font-semibold transition-all ${paymentType === "full" ? "bg-primary text-white" : "bg-surface-1 text-ink-500 hover:bg-surface-2"}`}
                 >
@@ -1631,7 +1674,7 @@ function BillingPage() {
                         const next = e.target.value;
                         const nextNum = Number(next) || 0;
                         if (nextNum > grandTotal) {
-                          setPayNow(String(grandTotal));
+                          setPayNow(grandTotal.toFixed(2));
                           setPaymentType("full");
                           toast.message("Full amount paid Ã¯Â¿Â½ switched to Full payment.");
                           return;
@@ -1639,7 +1682,7 @@ function BillingPage() {
                         setPayNow(next);
                         if (grandTotal > 0 && nextNum >= grandTotal) {
                           setPaymentType("full");
-                          setPayNow(String(grandTotal));
+                          setPayNow(grandTotal.toFixed(2));
                           toast.message("Full amount paid Ã¯Â¿Â½ switched to Full payment.");
                         }
                       }}
@@ -1711,7 +1754,7 @@ function BillingPage() {
                     onChange={(e) => {
                       const next = Number(e.target.value);
                       if (!Number.isNaN(next) && next > grandTotal) {
-                        setPayNow(String(grandTotal));
+                        setPayNow(grandTotal.toFixed(2));
                         toast.message("Paid amount capped to invoice total.");
                         return;
                       }

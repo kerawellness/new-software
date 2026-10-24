@@ -1,8 +1,19 @@
 import { differenceInMinutes, format, parseISO } from "date-fns";
 
-export function todayISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const CLINIC_TIME_ZONE = "Asia/Kolkata";
+
+/** Calendar date at the clinic, not the laptop's timezone. */
+export function todayISO(now: Date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: CLINIC_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const year = parts.find((part) => part.type === "year")?.value ?? "0000";
+  const month = parts.find((part) => part.type === "month")?.value ?? "01";
+  const day = parts.find((part) => part.type === "day")?.value ?? "01";
+  return `${year}-${month}-${day}`;
 }
 
 /** Calendar month add in local timezone (avoids UTC date shift from toISOString). */
@@ -113,9 +124,15 @@ export function isPatientPhone(value: string) {
   return /^\d{10}$/.test(patientPhoneDigits(value));
 }
 
+/** WhatsApp path: India country code plus the 10-digit mobile. Family +N is not part of the number. */
+export function whatsappDigits(phone: string): string {
+  const local = patientPhoneDigits(phone);
+  if (local.length === 10) return `91${local}`;
+  return local;
+}
+
 export function whatsappLink(phone: string, message: string) {
-  const digits = normalizePhone(phone).replace(/^\+/, "");
-  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+  return `https://wa.me/${whatsappDigits(phone)}?text=${encodeURIComponent(message)}`;
 }
 
 export function initials(name?: string | null) {

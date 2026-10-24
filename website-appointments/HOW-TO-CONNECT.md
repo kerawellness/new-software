@@ -66,11 +66,23 @@ BEGIN
     RAISE EXCEPTION 'Invalid email address';
   END IF;
   IF _requested_date IS NOT NULL
-     AND (_requested_date < CURRENT_DATE OR _requested_date > CURRENT_DATE + 730) THEN
+     AND (
+       _requested_date < (timezone('Asia/Kolkata', now()))::date
+       OR _requested_date > (timezone('Asia/Kolkata', now()))::date + 730
+     ) THEN
     RAISE EXCEPTION 'Invalid requested date';
   END IF;
   IF char_length(coalesce(_reason, '')) > 300 OR char_length(coalesce(_message, '')) > 2000 THEN
     RAISE EXCEPTION 'Appointment details are too long';
+  END IF;
+
+  IF (
+    SELECT count(*)
+    FROM public.online_appointment_requests
+    WHERE clinic_id = _clinic
+      AND created_at > now() - interval '10 minutes'
+  ) >= 20 THEN
+    RAISE EXCEPTION 'Please wait before submitting another request';
   END IF;
 
   IF EXISTS (

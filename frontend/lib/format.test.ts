@@ -12,6 +12,7 @@ import {
   todayISO,
   visitHasTreatment,
   visitKindCounts,
+  whatsappDigits,
   whatsappLink,
 } from "./format";
 
@@ -58,7 +59,9 @@ describe("Formatting Utilities (src/lib/format.ts)", () => {
 
   it("should generate WhatsApp links with encoded message text", () => {
     const link = whatsappLink("9876543210", "Hello Ramesh!");
-    expect(link).toBe("https://wa.me/9876543210?text=Hello%20Ramesh!");
+    expect(link).toBe("https://wa.me/919876543210?text=Hello%20Ramesh!");
+    expect(whatsappDigits("9876543210+1")).toBe("919876543210");
+    expect(whatsappDigits("+91 98765 43210")).toBe("919876543210");
   });
 
   it("should format dates and times reliably", () => {
@@ -76,6 +79,11 @@ describe("Formatting Utilities (src/lib/format.ts)", () => {
   it("should generate ISO date for today", () => {
     const today = todayISO();
     expect(today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("uses the India calendar date after midnight IST", () => {
+    expect(todayISO(new Date("2026-10-24T20:00:00.000Z"))).toBe("2026-10-25");
+    expect(todayISO(new Date("2026-10-24T18:00:00.000Z"))).toBe("2026-10-24");
   });
 
   it("classifies consultation vs treatment visits", () => {

@@ -59,7 +59,11 @@ function PatientsPage() {
   const navigate = useNavigate();
   const { showDemoData } = useShowDemoData();
   const [search, setSearch] = useState("");
+  const [rowLimit, setRowLimit] = useState(50);
   const term = useDebounced(search);
+  useEffect(() => {
+    setRowLimit(50);
+  }, [term]);
   useNewHotkey(() => void navigate({ to: "/patients/new" }));
 
   const countsQuery = useQuery({
@@ -82,7 +86,7 @@ function PatientsPage() {
   });
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["patients", term],
+    queryKey: ["patients", term, rowLimit],
     placeholderData: keepPreviousData,
     queryFn: async () => {
       let query = supabase
@@ -90,7 +94,7 @@ function PatientsPage() {
         .select("id, patient_code, full_name, phone, patient_type, status, created_at, visits(visit_date)")
         .order("created_at", { ascending: false })
         .order("visit_date", { foreignTable: "visits", ascending: false })
-        .limit(50)
+        .limit(rowLimit)
         .limit(1, { foreignTable: "visits" });
       if (term.trim()) {
         const t = term.trim();
@@ -210,6 +214,11 @@ function PatientsPage() {
               </Link>
             );
           })}
+          {(data?.length ?? 0) >= rowLimit ? (
+            <Button type="button" variant="outline" className="w-full" onClick={() => setRowLimit((count) => count + 50)}>
+              Show more patients
+            </Button>
+          ) : null}
         </div>
       )}
     </AppShell>

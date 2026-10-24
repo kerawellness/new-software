@@ -17,6 +17,8 @@ export function publicErrorMessage(
   if (message.includes("Payment cannot exceed balance due")) {
     return "Payment cannot exceed balance due.";
   }
+  if (message.includes("already reversed")) return "This payment was already reversed.";
+  if (message.includes("Payment not found")) return "Payment not found.";
   if (
     /^(Please|Select|Add|Enter|Choose|Paid amount|Payment amount|Clinic profile|Patient|Invoice|Booking clinic|Appointment details|No active clinic)/.test(
       message,

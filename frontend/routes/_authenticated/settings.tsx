@@ -46,9 +46,10 @@ import { useProfile } from "@/hooks/use-session";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { friendlyError, logAudit } from "@/lib/audit";
 import { CURRENCIES, TREATMENT_CATEGORIES } from "@/lib/constants";
-import { downloadClinicBackup } from "@/lib/clinic-backup";
+import { downloadClinicBackup, downloadZip, unlockBackup } from "@/lib/clinic-backup";
 import { composeClinicAddress, parseClinicBillExtras } from "@/lib/clinic-identity";
 import { formatCurrency, isPatientPhone, patientPhoneDigits, todayISO } from "@/lib/format";
+
 export const Route = createFileRoute("/_authenticated/settings")({
   validateSearch: (search: Record<string, unknown>): { tab?: "catalogue" | "backup" } => {
     if (search["tab"] === "catalogue" || search["tab"] === "backup") return { tab: search["tab"] };
@@ -84,6 +85,8 @@ function SettingsPage() {
   const [backupMonth, setBackupMonth] = useState(() => todayISO().slice(0, 7));
   const [backupFrom, setBackupFrom] = useState(() => todayISO().slice(0, 7));
   const [backupTo, setBackupTo] = useState(() => todayISO().slice(0, 7));
+  const [backupPassword, setBackupPassword] = useState("");
+  const [unlockPassword, setUnlockPassword] = useState("");
   const [backupBusy, setBackupBusy] = useState(false);
 
   const [addTreatmentOpen, setAddTreatmentOpen] = useState(false);
@@ -1016,11 +1019,12 @@ function SettingsPage() {
               <Download className="size-4" aria-hidden /> Backup
             </h3>
             <p className="text-sm text-ink-500">
-              Downloads organized CSV files in one zip: patients, appointments, visits,
-              treatments, bills, payments, follow-ups, and medical notes. One month uses
-              that month’s dates. Between months uses every date from the start month
-              through the end month. Overall is every date. The treatment price list is
-              always the current list.
+              Downloads organized CSV files in one locked file: patients, appointments, visits,
+              treatments, bills, payments, follow-ups, and medical notes. You need the password
+              to open it. This file is a spreadsheet copy. The copy you restore the clinic from
+              is Supabase → Database → Backups. One month uses that month’s dates. Between months
+              uses every date from the start month through the end month. Overall is every date.
+              The treatment price list is always the current list.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5 sm:col-span-2">
@@ -1075,6 +1079,17 @@ function SettingsPage() {
                 </>
               ) : null}
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="backup-password">Password</Label>
+              <Input
+                id="backup-password"
+                type="password"
+                autoComplete="new-password"
+                value={backupPassword}
+                onChange={(e) => setBackupPassword(e.target.value)}
+                placeholder="At least 8 characters"
+              />
+            </div>
             <Button
               type="button"
               className="w-full"
@@ -1091,6 +1106,10 @@ function SettingsPage() {
                   toast.error("Choose a start month and an end month.");
                   return;
                 }
+                if (backupPassword.trim().length < 8) {
+                  toast.error("Use a backup password of at least 8 characters.");
+                  return;
+                }
                 const fromMonth = backupFrom <= backupTo ? backupFrom : backupTo;
                 const toMonth = backupFrom <= backupTo ? backupTo : backupFrom;
                 setBackupBusy(true);
@@ -1100,7 +1119,7 @@ function SettingsPage() {
                     : backupMode === "between"
                       ? { mode: "between" as const, from: fromMonth, to: toMonth }
                       : { mode: "overall" as const };
-                void downloadClinicBackup(clinicId, scope)
+                void downloadClinicBackup(clinicId, scope, backupPassword)
                   .then(() => {
                     void logAudit(clinicId, "backup_downloaded", "clinic", clinicId, {
                       scope: backupMode,
@@ -1123,6 +1142,41 @@ function SettingsPage() {
               {backupBusy ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" aria-hidden />}
               Download backup
             </Button>
+            <div className="space-y-2 border-t pt-3">
+              <Label htmlFor="unlock-password">Open a locked backup</Label>
+              <Input
+                id="unlock-password"
+                type="password"
+                autoComplete="current-password"
+                value={unlockPassword}
+                onChange={(e) => setUnlockPassword(e.target.value)}
+                placeholder="Password used for that file"
+              />
+              <Input
+                type="file"
+                accept=".vspbackup"
+                aria-label="Locked backup file"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (!file) return;
+                  if (unlockPassword.trim().length < 8) {
+                    toast.error("Enter the backup password first.");
+                    return;
+                  }
+                  void file.arrayBuffer().then(async (buffer) => {
+                    try {
+                      const zip = await unlockBackup(new Uint8Array(buffer), unlockPassword);
+                      const name = file.name.replace(/\.vspbackup$/i, "") || "clinic-backup";
+                      downloadZip(zip, `${name}.zip`);
+                      toast.success("Backup opened. The zip is in your downloads.");
+                    } catch (err) {
+                      toast.error(friendlyError(err, "Unable to open that backup."));
+                    }
+                  });
+                }}
+              />
+            </div>
           </div>
         </TabsContent>
       </Tabs>

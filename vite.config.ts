@@ -56,7 +56,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 8080,
-      host: true,
+      host: "localhost",
     },
     plugins:
       mode === "test"
